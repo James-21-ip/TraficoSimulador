@@ -1,13 +1,17 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package modelo;
 
-/**
- *
- * @author PERCI
- */
-public class Auto {
-    
+public class Auto extends Vehiculo {
+
+    public Auto(double x, double y, Carril carril) {
+        super(x, y, carril);
+        definirCaracteristicas();
+    }
+
+    @Override
+    protected void definirCaracteristicas() {
+        velocidadMaxima = 60;
+        aceleracion = 8;
+        largo = 30;
+        ancho = 15;
+    }
 }
