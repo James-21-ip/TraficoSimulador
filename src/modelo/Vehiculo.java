@@ -10,23 +10,33 @@ public abstract class Vehiculo {
     protected double ancho;
     protected double largo;
     protected Carril carril;
+    protected boolean estaAveriado;
+    protected double tiempoAveriaRestante;
 
     public Vehiculo(double x, double y, Carril carril) {
         this.x = x;
         this.y = y;
         this.carril = carril;
         this.velocidad = 0;
+        this.estaAveriado = false;
     }
 
     protected abstract void definirCaracteristicas();
 
     public void mover(Vehiculo vehiculoAdelante, double deltaTime) {
+        if (estaAveriado) {
+            tiempoAveriaRestante -= deltaTime;
+            if (tiempoAveriaRestante <= 0) {
+                estaAveriado = false;
+            }
+            return; // averiado no se mueve
+        }
+
         double distanciaSegura = velocidad * 1.5;
         double distanciaLibre = (vehiculoAdelante != null)
                 ? distanciaHacia(vehiculoAdelante)
                 : Double.MAX_VALUE;
 
-        // si hay alguien muy cerca adelante, frenamos
         if (distanciaLibre < distanciaSegura) {
             velocidad = Math.max(0, velocidad - aceleracion * 2 * deltaTime);
         } else if (velocidad < velocidadMaxima) {
@@ -42,6 +52,16 @@ public abstract class Vehiculo {
 
     public void frenarEnSeco() {
         velocidad = 0;
+    }
+
+    public void averiar(double duracion) {
+        estaAveriado = true;
+        tiempoAveriaRestante = duracion;
+        velocidad = 0;
+    }
+
+    public boolean isAveriado() {
+        return estaAveriado;
     }
 
     public java.awt.geom.Rectangle2D getHitbox() {

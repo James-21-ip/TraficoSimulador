@@ -6,11 +6,17 @@ import java.util.*;
 public class GestorVehiculos {
 
     private List<Vehiculo> vehiculos;
+    private List<Bache> baches;
     private Random random;
 
     public GestorVehiculos() {
         vehiculos = new ArrayList<>();
+        baches = new ArrayList<>();
         random = new Random();
+    }
+
+    public void setBaches(List<Bache> baches) {
+        this.baches = baches;
     }
 
     public void intentarSpawn(Via viaEntrada, double lambda, double deltaTime) {
@@ -43,7 +49,46 @@ public class GestorVehiculos {
             Vehiculo adelante = v.getCarril().getVehiculoAdelante(v);
             v.mover(adelante, deltaTime);
         }
+        aplicarFiltradoMotos();
+        procesarBaches();
         detectarColisiones();
+    }
+
+    private void aplicarFiltradoMotos() {
+        for (Vehiculo v : vehiculos) {
+            if (v instanceof Moto) {
+                Moto moto = (Moto) v;
+                List<Carril> carriles = moto.getCarril().getVia().getCarriles();
+                int idx = carriles.indexOf(moto.getCarril());
+                Carril vecino = null;
+                if (idx + 1 < carriles.size()) {
+                    vecino = carriles.get(idx + 1);
+                } else if (idx - 1 >= 0) {
+                    vecino = carriles.get(idx - 1);
+                }
+                Vehiculo adelante = moto.getCarril().getVehiculoAdelante(moto);
+                moto.intentarFiltrarse(adelante, vecino);
+            }
+        }
+    }
+
+    private void procesarBaches() {
+        for (Vehiculo v : vehiculos) {
+            if (v.isAveriado()) continue;
+
+            for (Bache b : baches) {
+                double distancia = Math.hypot(v.getX() - b.getX(), v.getY() - b.getY());
+                if (distancia < 10) {
+                    if (random.nextDouble() < b.getSeveridad()) {
+                        if (random.nextDouble() < 0.2) {
+                            v.averiar(2 + random.nextDouble() * 3); // avería de 2 a 5 seg
+                        } else {
+                            v.frenarEnSeco();
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private void detectarColisiones() {
