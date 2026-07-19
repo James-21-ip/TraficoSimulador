@@ -40,6 +40,10 @@ public abstract class Vehiculo {
         return Math.hypot(otro.x - this.x, otro.y - this.y);
     }
 
+    public void frenarEnSeco() {
+        velocidad = 0;
+    }
+
     public java.awt.geom.Rectangle2D getHitbox() {
         return new java.awt.geom.Rectangle2D.Double(x - largo / 2, y - ancho / 2, largo, ancho);
     }
