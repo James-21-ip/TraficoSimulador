@@ -8,6 +8,8 @@ public class GestorVehiculos {
     private List<Vehiculo> vehiculos;
     private List<Bache> baches;
     private Random random;
+    private Set<String> bachesYaAplicados = new HashSet<>();
+    private static final double DISTANCIA_DETECCION_BACHE = 60;
 
     public GestorVehiculos() {
         vehiculos = new ArrayList<>();
@@ -20,17 +22,31 @@ public class GestorVehiculos {
     }
 
     public void intentarSpawn(Via viaEntrada, double lambda, double deltaTime) {
-        double probabilidad = 1 - Math.exp(-lambda * deltaTime);
+        for (Carril carril : viaEntrada.getCarriles()) {
+            double probabilidad = 1 - Math.exp(-lambda * deltaTime);
+            if (random.nextDouble() < probabilidad) {
+                double xInicial = viaEntrada.getTrazado().get(0).getX();
+                double yInicial = carril.getY();
 
-        if (random.nextDouble() < probabilidad) {
-            Carril carril = viaEntrada.getCarriles().get(0);
-            double xInicial = viaEntrada.getTrazado().get(0).getX();
-            double yInicial = carril.getY();
+                if (!hayEspacioParaSpawnear(carril, xInicial)) {
+                    continue;
+                }
 
-            Vehiculo nuevo = crearVehiculoAleatorio(xInicial, yInicial, carril);
-            carril.agregarVehiculo(nuevo);
-            vehiculos.add(nuevo);
+                Vehiculo nuevo = crearVehiculoAleatorio(xInicial, yInicial, carril);
+                carril.agregarVehiculo(nuevo);
+                vehiculos.add(nuevo);
+            }
         }
+    }
+
+    private boolean hayEspacioParaSpawnear(Carril carril, double xInicial) {
+        double distanciaMinima = 80;
+        for (Vehiculo v : carril.getVehiculos()) {
+            if (Math.abs(v.getX() - xInicial) < distanciaMinima) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private Vehiculo crearVehiculoAleatorio(double x, double y, Carril carril) {
@@ -49,25 +65,31 @@ public class GestorVehiculos {
             Vehiculo adelante = v.getCarril().getVehiculoAdelante(v);
             v.mover(adelante, deltaTime);
         }
-        aplicarFiltradoMotos();
+        aplicarEvasionBaches();
+        aplicarCambiosPorCongestion();
         procesarBaches();
         detectarColisiones();
     }
 
-    private void aplicarFiltradoMotos() {
+    private Carril carrilVecino(Carril actual) {
+        List<Carril> carriles = actual.getVia().getCarriles();
+        int idx = carriles.indexOf(actual);
+        if (idx + 1 < carriles.size()) return carriles.get(idx + 1);
+        if (idx - 1 >= 0) return carriles.get(idx - 1);
+        return null;
+    }
+
+    private void aplicarCambiosPorCongestion() {
         for (Vehiculo v : vehiculos) {
-            if (v instanceof Moto) {
-                Moto moto = (Moto) v;
-                List<Carril> carriles = moto.getCarril().getVia().getCarriles();
-                int idx = carriles.indexOf(moto.getCarril());
-                Carril vecino = null;
-                if (idx + 1 < carriles.size()) {
-                    vecino = carriles.get(idx + 1);
-                } else if (idx - 1 >= 0) {
-                    vecino = carriles.get(idx - 1);
-                }
-                Vehiculo adelante = moto.getCarril().getVehiculoAdelante(moto);
-                moto.intentarFiltrarse(adelante, vecino);
+            Vehiculo adelante = v.getCarril().getVehiculoAdelante(v);
+            v.intentarCambiarCarrilPorCongestion(adelante, carrilVecino(v.getCarril()));
+        }
+    }
+
+    private void aplicarEvasionBaches() {
+        for (Vehiculo v : vehiculos) {
+            for (Bache b : baches) {
+                v.intentarEvadirBache(b, carrilVecino(v.getCarril()), DISTANCIA_DETECCION_BACHE);
             }
         }
     }
@@ -77,15 +99,13 @@ public class GestorVehiculos {
             if (v.isAveriado()) continue;
 
             for (Bache b : baches) {
+                String clave = System.identityHashCode(v) + "-" + System.identityHashCode(b);
+                if (bachesYaAplicados.contains(clave)) continue;
+
                 double distancia = Math.hypot(v.getX() - b.getX(), v.getY() - b.getY());
                 if (distancia < 10) {
-                    if (random.nextDouble() < b.getSeveridad()) {
-                        if (random.nextDouble() < 0.2) {
-                            v.averiar(2 + random.nextDouble() * 3); // avería de 2 a 5 seg
-                        } else {
-                            v.frenarEnSeco();
-                        }
-                    }
+                    bachesYaAplicados.add(clave);
+                    v.reducirVelocidadPorBache(b.getSeveridad());
                 }
             }
         }
@@ -99,7 +119,9 @@ public class GestorVehiculos {
 
                 if (a.getCarril() != b.getCarril()) continue;
 
-                if (a.getHitbox().intersects(b.getHitbox())) {
+                java.awt.geom.Area areaA = new java.awt.geom.Area(a.getHitbox());
+                areaA.intersect(new java.awt.geom.Area(b.getHitbox()));
+                if (!areaA.isEmpty()) {
                     manejarColision(a, b);
                 }
             }

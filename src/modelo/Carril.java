@@ -24,22 +24,41 @@ public class Carril {
         vehiculos.remove(v);
     }
 
-    // el de mas adelante en este carril, o null si no hay nadie
     public Vehiculo getVehiculoAdelante(Vehiculo referencia) {
-        Vehiculo masCercano = null;
-        double menorDistancia = Double.MAX_VALUE;
+    double[] dir = getDireccion();
+    Vehiculo masCercano = null;
+    double menorDistancia = Double.MAX_VALUE;
 
-        for (Vehiculo v : vehiculos) {
-            if (v == referencia) continue;
-            double dist = v.getX() - referencia.getX();
-            if (sentidoIda && dist > 0 && dist < menorDistancia) {
-                masCercano = v;
-                menorDistancia = dist;
-            }
+    for (Vehiculo v : vehiculos) {
+        if (v == referencia) continue;
+        double dx = v.getX() - referencia.getX();
+        double dy = v.getY() - referencia.getY();
+        double proyeccion = dx * dir[0] + dy * dir[1];
+        if (proyeccion > 0 && proyeccion < menorDistancia) {
+            masCercano = v;
+            menorDistancia = proyeccion;
         }
-        return masCercano;
     }
+    return masCercano;
+}
 
+    // vector unitario hacia donde avanza este carril, segun el trazado de la via y su sentido
+public double[] getDireccion() {
+    List<java.awt.geom.Point2D> trazado = via.getTrazado();
+    java.awt.geom.Point2D inicio = trazado.get(0);
+    java.awt.geom.Point2D fin = trazado.get(trazado.size() - 1);
+    double dx = fin.getX() - inicio.getX();
+    double dy = fin.getY() - inicio.getY();
+    double largo = Math.hypot(dx, dy);
+    dx /= largo;
+    dy /= largo;
+    if (!sentidoIda) {
+        dx = -dx;
+        dy = -dy;
+    }
+    return new double[]{dx, dy};
+}
+    
     // usado por la moto para saber si se puede filtrar
     public double espacioLibreCerca(double x, double y) {
         double masCercano = Double.MAX_VALUE;
