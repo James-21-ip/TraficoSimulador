@@ -1,10 +1,8 @@
-package simuladortrafico.modelo;
+package modelo;
 
+// Estado actual de un semáforo y su temporizador.
 
- // Estado actual de un semáforo y su temporizador.
- 
 public class Semaforo {
-
     public enum Estado { ROJO, AMARILLO, VERDE }
 
     private Estado estadoActual;
