@@ -1,3 +1,4 @@
+// Vehiculo.java
 package modelo;
 
 public abstract class Vehiculo {
@@ -29,7 +30,17 @@ public abstract class Vehiculo {
 
     protected abstract void definirCaracteristicas();
 
+    /** Atajo para cuando no hay semáforo/puente que considerar (ej. PruebaVehiculos). */
     public void mover(Vehiculo vehiculoAdelante, double deltaTime) {
+        mover(vehiculoAdelante, null, deltaTime);
+    }
+
+    /**
+     * @param distanciaHastaParada distancia hasta un semáforo en rojo/ámbar o un
+     *        puente ocupado que está en la vía de este vehículo; null si no hay
+     *        ninguno (o si ya está en verde / el puente está libre).
+     */
+    public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada, double deltaTime) {
         if (estaAveriado) {
             tiempoAveriaRestante -= deltaTime;
             if (tiempoAveriaRestante <= 0) {
@@ -43,16 +54,26 @@ public abstract class Vehiculo {
         }
 
         double margenMinimo = 10;
-        double distanciaSegura = velocidad * 1.5 + margenMinimo;
-        if (vehiculoAdelante != null) {
-            distanciaSegura += largo / 2 + vehiculoAdelante.largo / 2;
-        }
 
-        double distanciaLibre = (vehiculoAdelante != null)
+        // frenado por el vehículo de adelante (igual que antes)
+        double distanciaSeguraVehiculo = velocidad * 1.5 + margenMinimo;
+        if (vehiculoAdelante != null) {
+            distanciaSeguraVehiculo += largo / 2 + vehiculoAdelante.largo / 2;
+        }
+        double distanciaLibreVehiculo = (vehiculoAdelante != null)
                 ? distanciaHacia(vehiculoAdelante)
                 : Double.MAX_VALUE;
 
-        if (distanciaLibre < distanciaSegura) {
+        // frenado por semáforo en rojo / puente ocupado (nuevo)
+        double distanciaSeguraParada = velocidad * 1.5 + margenMinimo + largo / 2;
+        double distanciaLibreParada = (distanciaHastaParada != null)
+                ? distanciaHastaParada
+                : Double.MAX_VALUE;
+
+        boolean debeFrenar = distanciaLibreVehiculo < distanciaSeguraVehiculo
+                || distanciaLibreParada < distanciaSeguraParada;
+
+        if (debeFrenar) {
             velocidad = Math.max(0, velocidad - aceleracion * 2 * deltaTime);
         } else if (velocidad < velocidadMaxima) {
             velocidad = Math.min(velocidadMaxima, velocidad + aceleracion * deltaTime);
@@ -60,7 +81,7 @@ public abstract class Vehiculo {
 
         double[] direccion = carril.getDireccion();
         x += direccion[0] * velocidad * deltaTime;
-        y += direccion[1] * velocidad * deltaTime; // en vias horizontales esto no interfiere con el cambio de carril
+        y += direccion[1] * velocidad * deltaTime;
     }
 
     protected double distanciaHacia(Vehiculo otro) {
@@ -85,8 +106,6 @@ public abstract class Vehiculo {
         velocidad *= (1 - severidad);
     }
 
-    // --- cambio de carril, con dos motivos distintos que lo disparan ---
-
     public void intentarCambiarCarrilPorCongestion(Vehiculo adelante, Carril carrilVecino) {
         if (cambiandoCarril || carrilVecino == null) return;
         boolean atascado = velocidad < 5 && adelante != null && distanciaHacia(adelante) < 40;
@@ -108,8 +127,8 @@ public abstract class Vehiculo {
         double[] dir = carril.getDireccion();
         double dx = b.getX() - x;
         double dy = b.getY() - y;
-        double proyeccion = dx * dir[0] + dy * dir[1]; // que tan adelante esta, en el sentido del carril
-        double lateral = Math.abs(dx * dir[1] - dy * dir[0]); // que tan desviado del eje del carril
+        double proyeccion = dx * dir[0] + dy * dir[1];
+        double lateral = Math.abs(dx * dir[1] - dy * dir[0]);
         return proyeccion > 0 && proyeccion < distanciaDeteccion && lateral < ancho + 5;
     }
 
@@ -136,7 +155,6 @@ public abstract class Vehiculo {
         }
     }
 
-    // --- hitbox: rectangulo normal, o rotado si esta cambiando de carril ---
     public java.awt.Shape getHitbox() {
         java.awt.geom.Rectangle2D rect =
                 new java.awt.geom.Rectangle2D.Double(x - largo / 2, y - ancho / 2, largo, ancho);
