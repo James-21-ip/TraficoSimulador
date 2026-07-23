@@ -1,27 +1,8 @@
 package vista;
 
+import fichero.ArchivoMapa;
 import gestor.GestorCruces;
 import gestor.GestorVehiculos;
-import modelo.Auto;
-import modelo.Bache;
-import modelo.Bus;
-import modelo.Carril;
-import modelo.Cruce;
-import modelo.Moto;
-import modelo.Puente;
-import modelo.Semaforo;
-import modelo.Vehiculo;
-import modelo.Via;
-import modelo.ZonaCruce;
-
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JSlider;
-import javax.swing.Timer;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.geom.Point2D;
@@ -30,6 +11,26 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSlider;
+import javax.swing.Timer;
+import modelo.Auto;
+import modelo.Bache;
+import modelo.Bus;
+import modelo.Carril;
+import modelo.Cruce;
+import modelo.Entrada;
+import modelo.Moto;
+import modelo.Puente;
+import modelo.Semaforo;
+import modelo.Vehiculo;
+import modelo.Via;
+import modelo.ZonaCruce;
 
 /**
  * Ventana principal: arma el mapa (avenida + 2 calles + 2 cruces + baches),
@@ -51,6 +52,7 @@ import java.util.Random;
  * Puente + GestorCruces, sin tocar esas clases.
  */
 public class VentanaPrincipal extends JFrame {
+    private List<Entrada> entradas;
 
     private static final int TICK_MS = 50; // 20 ticks por segundo
 
@@ -72,7 +74,6 @@ public class VentanaPrincipal extends JFrame {
     private List<Puente> puentesDemo;
     private List<Bache> baches;
 
-    private final List<Entrada> entradas = new ArrayList<>();
 
     private Puente puenteDemo;
 
@@ -88,79 +89,23 @@ public class VentanaPrincipal extends JFrame {
         iniciarLoopSimulacion();
     }
 
-    /** Una vía de entrada al mapa, con su tasa de aparición (lambda de Poisson). */
-    private static class Entrada {
-        final Via via;
-        final double lambda;
-        Entrada(Via via, double lambda) { this.via = via; this.lambda = lambda; }
-    }
-
     // ---------- mapa real: avenida + 2 calles + 2 cruces ----------
-
     private void construirMapa() {
-        int yEste = Y_AVENIDA - 10; // carril que va hacia el este (x creciente)
-        int yOeste = Y_AVENIDA + 10; // carril que va hacia el oeste (x decreciente)
-        int mitadCebra = 26; // debe coincidir con el tamaño de la ZonaCruce (52/2)
+        ArchivoMapa lector = new ArchivoMapa();
+        
+        // Le indicamos que busque dentro del paquete 'mapas'
+        lector.cargarMapa("/mapas/mapa.txt");
 
-        // avenida, sentido este (entra por el oeste, cruza cruce1 y cruce2, sale por el este)
-        // las vías terminan justo antes de la cebra: ahí es donde de verdad se detiene el auto.
-        Via avE1 = crearVia(40, yEste, X_CRUCE_1 - mitadCebra, yEste);
-        Via avE2 = crearVia(X_CRUCE_1 + mitadCebra, yEste, X_CRUCE_2 - mitadCebra, yEste);
-        Via avE3 = crearVia(X_CRUCE_2 + mitadCebra, yEste, MAPA_ANCHO - 20, yEste);
-        avE1.agregarConexion(avE2);
-        avE2.agregarConexion(avE3);
-
-        // avenida, sentido oeste (entra por el este, cruza cruce2 y cruce1, sale por el oeste)
-        Via avW1 = crearVia(MAPA_ANCHO - 20, yOeste, X_CRUCE_2 + mitadCebra, yOeste);
-        Via avW2 = crearVia(X_CRUCE_2 - mitadCebra, yOeste, X_CRUCE_1 + mitadCebra, yOeste);
-        Via avW3 = crearVia(X_CRUCE_1 - mitadCebra, yOeste, 40, yOeste);
-        avW1.agregarConexion(avW2);
-        avW2.agregarConexion(avW3);
-
-        // calle 1 (cruza en cruce1): sentido sur y sentido norte
-        int xC1Sur = X_CRUCE_1 - 9;
-        int xC1Norte = X_CRUCE_1 + 9;
-        Via c1S1 = crearVia(xC1Sur, 40, xC1Sur, Y_AVENIDA - mitadCebra);
-        Via c1S2 = crearVia(xC1Sur, Y_AVENIDA + mitadCebra, xC1Sur, MAPA_ALTO - 20);
-        c1S1.agregarConexion(c1S2);
-        Via c1N1 = crearVia(xC1Norte, MAPA_ALTO - 20, xC1Norte, Y_AVENIDA + mitadCebra);
-        Via c1N2 = crearVia(xC1Norte, Y_AVENIDA - mitadCebra, xC1Norte, 40);
-        c1N1.agregarConexion(c1N2);
-
-        // calle 2 (cruza en cruce2): sentido sur y sentido norte
-        int xC2Sur = X_CRUCE_2 - 9;
-        int xC2Norte = X_CRUCE_2 + 9;
-        Via c2S1 = crearVia(xC2Sur, 40, xC2Sur, Y_AVENIDA - mitadCebra);
-        Via c2S2 = crearVia(xC2Sur, Y_AVENIDA + mitadCebra, xC2Sur, MAPA_ALTO - 20);
-        c2S1.agregarConexion(c2S2);
-        Via c2N1 = crearVia(xC2Norte, MAPA_ALTO - 20, xC2Norte, Y_AVENIDA + mitadCebra);
-        Via c2N2 = crearVia(xC2Norte, Y_AVENIDA - mitadCebra, xC2Norte, 40);
-        c2N1.agregarConexion(c2N2);
-
-        Cruce cruce1 = crearCruce(X_CRUCE_1, Y_AVENIDA, avE1, avW2, c1S1, c1N1);
-        Cruce cruce2 = crearCruce(X_CRUCE_2, Y_AVENIDA, avE2, avW1, c2S1, c2N1);
-
-        vias = new ArrayList<>(Arrays.asList(
-                avE1, avE2, avE3, avW1, avW2, avW3,
-                c1S1, c1S2, c1N1, c1N2, c2S1, c2S2, c2N1, c2N2));
-        cruces = new ArrayList<>(Arrays.asList(cruce1, cruce2));
-
-        baches = new ArrayList<>(Arrays.asList(
-                new Bache((X_CRUCE_1 + X_CRUCE_2) / 2.0, yEste, 0.5),
-                new Bache((X_CRUCE_1 + X_CRUCE_2) / 2.0, yOeste, 0.6),
-                new Bache(xC1Sur, 220, 0.4)));
-
-        entradas.add(new Entrada(avE1, 0.30));
-        entradas.add(new Entrada(avW1, 0.30));
-        entradas.add(new Entrada(c1S1, 0.15));
-        entradas.add(new Entrada(c1N1, 0.15));
-        entradas.add(new Entrada(c2S1, 0.15));
-        entradas.add(new Entrada(c2N1, 0.15));
+        this.vias = lector.getVias();
+        this.cruces = lector.getCruces();
+        this.baches = lector.getBaches();
+        this.entradas = lector.getEntradas();
 
         gestorVehiculos = new GestorVehiculos();
         gestorVehiculos.setCruces(cruces);
         gestorVehiculos.setBaches(baches);
     }
+
 
     private Via crearVia(double x1, double y1, double x2, double y2) {
         List<Point2D> trazado = Arrays.asList(new Point2D.Double(x1, y1), new Point2D.Double(x2, y2));
@@ -299,7 +244,7 @@ public class VentanaPrincipal extends JFrame {
         }
     }
 
-    // ---------- loop de simulación ----------
+// ---------- loop de simulación ----------
 
     private void iniciarLoopSimulacion() {
         timer = new Timer(TICK_MS, e -> {
@@ -307,7 +252,8 @@ public class VentanaPrincipal extends JFrame {
             double deltaTime = (TICK_MS / 1000.0) * multiplicadorVelocidad;
 
             for (Entrada entrada : entradas) {
-                gestorVehiculos.intentarSpawn(entrada.via, entrada.lambda, deltaTime);
+                // AQUÍ ESTÁ LA CORRECCIÓN: Usar getVia() y getLambda()
+                gestorVehiculos.intentarSpawn(entrada.getVia(), entrada.getLambda(), deltaTime);
             }
             gestorVehiculos.actualizar(deltaTime);
             gestorCruces.actualizar(deltaTime);

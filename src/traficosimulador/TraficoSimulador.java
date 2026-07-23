@@ -1,8 +1,7 @@
 package traficosimulador;
 
-import vista.VentanaPrincipal;
-
 import javax.swing.SwingUtilities;
+import vista.VentanaPrincipal;
 
 public class TraficoSimulador {
 
@@ -12,4 +11,4 @@ public class TraficoSimulador {
             ventana.setVisible(true);
         });
     }
-}
+}   
