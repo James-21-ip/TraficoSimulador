@@ -78,7 +78,38 @@ public class Carril {
         }
         return masCercano;
     }
+/** Distancia (proyectada sobre la direccion del carril) hasta el vehiculo mas
+ * cercano que esta ADELANTE de (x,y) en este carril. Double.MAX_VALUE si no hay
+ * ninguno. A diferencia de espacioLibreCerca(), no mezcla vehiculos de atras con
+ * los de adelante: para decidir si vale la pena cambiarse de carril, lo que
+ * importa es cuanto camino libre hay por delante, no solo que el costado este
+ * despejado en este instante. */
+public double espacioLibreAdelante(double x, double y) {
+    double[] dir = getDireccion();
+    double masCercano = Double.MAX_VALUE;
+    for (Vehiculo v : vehiculos) {
+        double dx = v.getX() - x;
+        double dy = v.getY() - y;
+        double proyeccion = dx * dir[0] + dy * dir[1];
+        if (proyeccion > 0 && proyeccion < masCercano) masCercano = proyeccion;
+    }
+    return masCercano;
+}
 
+/** Igual que espacioLibreAdelante() pero mirando hacia ATRAS: distancia al
+ * vehiculo mas cercano que viene detras de (x,y) en este carril. Sirve para no
+ * meterse literalmente encima de alguien que viene por el carril vecino. */
+public double espacioLibreAtras(double x, double y) {
+    double[] dir = getDireccion();
+    double masCercano = Double.MAX_VALUE;
+    for (Vehiculo v : vehiculos) {
+        double dx = v.getX() - x;
+        double dy = v.getY() - y;
+        double proyeccion = dx * dir[0] + dy * dir[1];
+        if (proyeccion < 0 && -proyeccion < masCercano) masCercano = -proyeccion;
+    }
+    return masCercano;
+}
     /**
      * Vector unitario perpendicular al trazado de la via (siempre calculado sobre el
      * sentido "ida" del trazado, sin importar el sentido de este carril en particular),

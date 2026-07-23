@@ -152,12 +152,13 @@ public class VentanaPrincipal extends JFrame {
                 new Bache((X_CRUCE_1 + X_CRUCE_2) / 2.0, Y_AVENIDA + OFFSET_RAPIDO, 0.6),
                 new Bache(X_CRUCE_1 - OFFSET_RAPIDO, 220, 0.4)));
 
-        entradas.add(new Entrada(avE1, 0.30));
-        entradas.add(new Entrada(avW1, 0.30));
-        entradas.add(new Entrada(c1S1, 0.15));
-        entradas.add(new Entrada(c1N1, 0.15));
-        entradas.add(new Entrada(c2S1, 0.15));
-        entradas.add(new Entrada(c2N1, 0.15));
+        // lambdas bajadas (antes 0.30 / 0.15) para aliviar el amontonamiento en los cruces
+        entradas.add(new Entrada(avE1, 0.20));
+        entradas.add(new Entrada(avW1, 0.20));
+        entradas.add(new Entrada(c1S1, 0.10));
+        entradas.add(new Entrada(c1N1, 0.10));
+        entradas.add(new Entrada(c2S1, 0.10));
+        entradas.add(new Entrada(c2N1, 0.10));
 
         gestorVehiculos = new GestorVehiculos();
         gestorVehiculos.setCruces(cruces);
@@ -299,8 +300,8 @@ public class VentanaPrincipal extends JFrame {
 
     private Vehiculo crearVehiculoAleatorio(double x, double y, Carril carril) {
         double r = randomPuente.nextDouble();
-        if (r < 0.70) return new Auto(x, y, carril);
-        if (r < 0.90) return new Bus(x, y, carril);
+        if (r < 0.55) return new Auto(x, y, carril);
+        if (r < 0.70) return new Bus(x, y, carril);
         return new Moto(x, y, carril);
     }
 

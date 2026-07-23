@@ -61,11 +61,14 @@ public class GestorVehiculos {
         return true;
     }
 
+    // menos autos y un poco menos de buses (son los mas grandes/lentos y los que mas
+    // se notan cuando se amontonan en los cruces); mas motos, que ocupan menos espacio
+    // y liberan la interseccion mas rapido.
     private Vehiculo crearVehiculoAleatorio(double x, double y, Carril carril) {
         double r = random.nextDouble();
-        if (r < 0.65) {
+        if (r < 0.50) {
             return new Auto(x, y, carril);
-        } else if (r < 0.85) {
+        } else if (r < 0.65) {
             return new Bus(x, y, carril);
         } else {
             return new Moto(x, y, carril);
@@ -83,6 +86,7 @@ public class GestorVehiculos {
         aplicarGirosEnIntersecciones();
         procesarBaches();
         detectarColisiones();
+        detectarColisionesEnCruce(deltaTime);
         sincronizarColasDeCruces();
         eliminarVehiculosFueraDeRango();
     }
@@ -216,7 +220,17 @@ public class GestorVehiculos {
             v.comprometerACruzar();
             return null;
         }
-        // VERDE: sigue de largo, no hay parada
+
+        // VERDE, pero hay un peaton cruzando la zona del cruce: el boton de
+        // demo (o un GestorPeatones real a futuro) marca hayPeatonCruzando()
+        // y antes esto no se chequeaba nunca aca, asi que el peaton no
+        // frenaba a nadie. Se trata igual que un rojo: el vehiculo se detiene
+        // en la linea hasta que la zona quede libre.
+        Cruce cruce = buscarCruce(via);
+        if (cruce != null && cruce.getZonaCruce().hayPeatonCruzando()) {
+            return distanciaLinea;
+        }
+        // VERDE y sin peatones: sigue de largo, no hay parada
     }
 
     for (Puente puente : puentes) {
@@ -241,6 +255,18 @@ private double avanceRestanteHastaFinDeVia(Vehiculo v, Via via) {
             for (Cruce.Acceso acceso : cruce.getAccesos()) {
                 if (acceso.getVia() == via) {
                     return acceso;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** El Cruce (interseccion completa) al que pertenece esta via de entrada, si es que es un acceso de alguno. */
+    private Cruce buscarCruce(Via via) {
+        for (Cruce cruce : cruces) {
+            for (Cruce.Acceso acceso : cruce.getAccesos()) {
+                if (acceso.getVia() == via) {
+                    return cruce;
                 }
             }
         }
@@ -333,6 +359,34 @@ private double avanceRestanteHastaFinDeVia(Vehiculo v, Via via) {
                 if (!areaA.isEmpty()) {
                     manejarColision(a, b);
                 }
+            }
+        }
+    }
+
+    // Red de seguridad especifica para el "se atraviesan en el cruce": detectarColisiones()
+    // de arriba solo compara vehiculos del MISMO carril, asi que dos vehiculos que estan
+    // cruzando (animacion girarHaciaVia) por carriles distintos de la misma interseccion al
+    // mismo tiempo nunca se comparaban entre si y podian pasar uno a traves del otro. Esto
+    // se restringe a pares donde AMBOS estan cruzando (cruzandoInterseccion) para no afectar
+    // el cambio de carril normal ni el seguimiento vehiculo-a-vehiculo, que ya estan cubiertos.
+    private void detectarColisionesEnCruce(double deltaTime) {
+        for (int i = 0; i < vehiculos.size(); i++) {
+            Vehiculo a = vehiculos.get(i);
+            if (!a.isCruzandoInterseccion()) continue;
+
+            for (int j = i + 1; j < vehiculos.size(); j++) {
+                Vehiculo b = vehiculos.get(j);
+                if (!b.isCruzandoInterseccion()) continue;
+                if (a.getCarril() == b.getCarril()) continue; // ya cubierto por detectarColisiones()
+
+                java.awt.geom.Area areaA = new java.awt.geom.Area(a.getHitbox());
+                areaA.intersect(new java.awt.geom.Area(b.getHitbox()));
+                if (areaA.isEmpty()) continue;
+
+                // sus caminos se tocan: el que entro despues (menos progreso) cede el paso
+                // congelandose este tick, en vez de seguir atravesando al que iba adelante.
+                Vehiculo cede = a.getProgresoInterseccion() <= b.getProgresoInterseccion() ? a : b;
+                cede.retrocederCruce(deltaTime);
             }
         }
     }

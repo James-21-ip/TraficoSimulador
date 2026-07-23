@@ -176,6 +176,25 @@ public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada, double
 
         public boolean isCruzandoInterseccion() { return cruzandoInterseccion; }
 
+        /** Cuanto lleva avanzado (en segundos) este cruce animado; sirve para decidir, si dos
+         * vehiculos cruzando por carriles distintos de la misma interseccion llegan a tocarse,
+         * cual entro primero (el que menos progreso lleva es el que cede el paso). */
+        public double getProgresoInterseccion() {
+            return cruzandoInterseccion ? tiempoInterseccion : Double.MAX_VALUE;
+        }
+
+        /** Deshace el avance de este tick del cruce animado (lo "congela" un instante) para
+         * cederle el paso a otro vehiculo cuyos caminos se tocaron dentro de la interseccion. */
+        public void retrocederCruce(double deltaTime) {
+            if (!cruzandoInterseccion) return;
+            tiempoInterseccion = Math.max(0, tiempoInterseccion - deltaTime);
+            double t = (duracionInterseccion > 0) ? Math.min(1.0, tiempoInterseccion / duracionInterseccion) : 1.0;
+            double dx = destinoInterseccion[0] - origenInterseccion[0];
+            double dy = destinoInterseccion[1] - origenInterseccion[1];
+            x = origenInterseccion[0] + dx * t;
+            y = origenInterseccion[1] + dy * t;
+        }
+
         private void actualizarAnguloBase() {
             double[] dir = carril.getDireccion();
             anguloBase = Math.toDegrees(Math.atan2(dir[1], dir[0]));
@@ -236,25 +255,46 @@ public boolean estaComprometidoACruzar() {
         }
 
      public void intentarCambiarCarrilPorCongestion(Vehiculo adelante, Carril carrilVecino) {
-        if (cambiandoCarril || carrilVecino == null || tiempoDesdeUltimoCambio < COOLDOWN_CAMBIO_CARRIL) return;
+    if (cambiandoCarril || carrilVecino == null || tiempoDesdeUltimoCambio < COOLDOWN_CAMBIO_CARRIL) return;
 
-        boolean atascado = velocidad < 5 && adelante != null
-                && distanciaHacia(adelante) < (largo / 2 + adelante.largo / 2 + 15);
+    boolean atascado = velocidad < 5 && adelante != null
+            && distanciaHacia(adelante) < (largo / 2 + adelante.largo / 2 + 15);
 
-        if (!atascado) return;
-        if (carrilVecino.espacioLibreCerca(x, y) > largo + 10) {
-            iniciarCambioCarril(carrilVecino);
-        }
+    if (!atascado) return;
+    if (hayEspacioSuficienteParaCambiar(carrilVecino)) {
+        iniciarCambioCarril(carrilVecino);
     }
+}
 
-        public void intentarEvadirBache(Bache bache, Carril carrilVecino, double distanciaDeteccion) {
-        if (cambiandoCarril || carrilVecino == null || tiempoDesdeUltimoCambio < COOLDOWN_EVASION_BACHE) return;
+public void intentarEvadirBache(Bache bache, Carril carrilVecino, double distanciaDeteccion) {
+    if (cambiandoCarril || carrilVecino == null || tiempoDesdeUltimoCambio < COOLDOWN_EVASION_BACHE) return;
 
-            if (!bacheEnCamino(bache, distanciaDeteccion)) return;
-            if (carrilVecino.espacioLibreCerca(x, y) > largo + 10) {
-                iniciarCambioCarril(carrilVecino);
-            }
-        }   
+    if (!bacheEnCamino(bache, distanciaDeteccion)) return;
+    if (hayEspacioSuficienteParaCambiar(carrilVecino)) {
+        iniciarCambioCarril(carrilVecino);
+    }
+}
+
+/** Determina si en carrilVecino hay espacio realmente aprovechable para
+ * cambiarse: no basta con que el costado este libre en este instante, hace
+ * falta que ADELANTE (en el carril vecino) haya distancia de sobra como para
+ * que el cambio sirva de algo. Sin esto, un vehiculo podia meterse a un
+ * carril que a los pocos metros vuelve a estar obstruido, o incluso oscilar
+ * de un carril a otro sin avanzar realmente (p. ej. una moto "indecisa"
+ * entre dos autos a la misma altura). Tambien se exige un colchon minimo
+ * detras, para no meterse encima de un vehiculo que viene por ese carril. */
+private boolean hayEspacioSuficienteParaCambiar(Carril carrilVecino) {
+    double espacioAdelante = carrilVecino.espacioLibreAdelante(x, y);
+    double espacioAtras = carrilVecino.espacioLibreAtras(x, y);
+
+    // mismo criterio que la distancia segura de seguimiento (velocidad*1.5 + margen),
+    // pero con un colchon extra: no alcanza con "no chocar", tiene que quedar espacio
+    // de sobra para que valga la pena el cambio.
+    double espacioAdelanteMinimo = velocidad * 1.5 + largo * 3 + 20;
+    double espacioAtrasMinimo = largo * 1.5 + 10;
+
+    return espacioAdelante > espacioAdelanteMinimo && espacioAtras > espacioAtrasMinimo;
+} 
 
        private boolean bacheEnCamino(Bache b, double distanciaDeteccion) {
     double[] dir = carril.getDireccion();

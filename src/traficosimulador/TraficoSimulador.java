@@ -9,6 +9,6 @@ public class TraficoSimulador {
         SwingUtilities.invokeLater(() -> {
             VentanaPrincipal ventana = new VentanaPrincipal();
             ventana.setVisible(true);
-        });
+        }); 
     }
 }   
