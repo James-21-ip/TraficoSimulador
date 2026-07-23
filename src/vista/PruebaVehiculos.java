@@ -6,40 +6,73 @@ import gestor.GestorVehiculos;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.geom.Point2D;
-import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.List;
 
 public class PruebaVehiculos extends JPanel {
 
-    private final Via via;
+    private final Via viaEntrada;      // (0,300) -> (300,300)
+    private final Via viaBajada;       // (300,300) -> (300,550)  giro hacia abajo
+    private final Via viaTramoMedio;   // (300,300) -> (650,300)  sigue derecho
+    private final Via viaSubida;       // (650,300) -> (650,50)   giro hacia arriba
+    private final Via viaTramoFinal;   // (650,300) -> (1000,300) sigue derecho hasta salir
+
     private final GestorVehiculos gestor = new GestorVehiculos();
-    private final double lambda = 0.4;
+    private final double lambda = 0.35;
     private final Timer timer;
     private final double deltaTime = 1.0 / 60.0;
 
     public PruebaVehiculos() {
-        setPreferredSize(new Dimension(900, 200));
+        setPreferredSize(new Dimension(1000, 600));
         setBackground(Color.DARK_GRAY);
 
-        List<Point2D> trazado = new ArrayList<>();
-        trazado.add(new Point2D.Double(0, 100));
-        trazado.add(new Point2D.Double(900, 100));
+        viaEntrada = crearViaHorizontal(0, 300, 300, 2);
+        viaBajada = crearViaVertical(300, 300, 550, 1);
+        viaTramoMedio = crearViaHorizontal(300, 300, 650, 2);
+        viaSubida = crearViaVertical(650, 300, 50, 1);
+        viaTramoFinal = crearViaHorizontal(650, 300, 1000, 2);
 
-        via = new Via(trazado, 2, false, 15.0);
-        via.getCarriles().get(0).setOffsetY(85);
-        via.getCarriles().get(1).setOffsetY(115);
+        // primer punto de giro: al final de la entrada, puede bajar o seguir derecho
+        viaEntrada.agregarConexion(viaBajada);
+        viaEntrada.agregarConexion(viaTramoMedio);
 
+        // segundo punto de giro, mas adelante: puede subir o seguir derecho hasta salir
+        viaTramoMedio.agregarConexion(viaSubida);
+        viaTramoMedio.agregarConexion(viaTramoFinal);
+
+        // baches bien separados entre si y lejos de los puntos de giro
         List<Bache> baches = new ArrayList<>();
-        baches.add(new Bache(800, 85, 0.5));  // cerca del final, carril de arriba
-        baches.add(new Bache(450, 115, 0.6)); // a la mitad, carril de abajo
+        baches.add(new Bache(120, 292, 0.5)); // en viaEntrada, carril de arriba
+        baches.add(new Bache(480, 308, 0.6)); // en viaTramoMedio, carril de abajo
+        baches.add(new Bache(820, 292, 0.5)); // en viaTramoFinal, carril de arriba
         gestor.setBaches(baches);
 
         timer = new Timer(16, e -> {
-            gestor.intentarSpawn(via, lambda, deltaTime);
+            gestor.intentarSpawn(viaEntrada, lambda, deltaTime);
             gestor.actualizar(deltaTime);
             repaint();
         });
+    }
+
+    private Via crearViaHorizontal(double xInicio, double y, double xFin, int carriles) {
+        List<Point2D> trazado = new ArrayList<>();
+        trazado.add(new Point2D.Double(xInicio, y));
+        trazado.add(new Point2D.Double(xFin, y));
+        Via via = new Via(trazado, carriles, false, 60.0);
+        if (carriles == 2) {
+            via.getCarriles().get(0).setOffsetY(-8);
+            via.getCarriles().get(1).setOffsetY(8);
+        }
+        return via;
+    }
+
+    private Via crearViaVertical(double x, double yInicio, double yFin, int carriles) {
+        List<Point2D> trazado = new ArrayList<>();
+        trazado.add(new Point2D.Double(x, yInicio));
+        trazado.add(new Point2D.Double(x, yFin));
+        Via via = new Via(trazado, carriles, false, 60.0);
+        via.getCarriles().get(0).setOffsetY(0);
+        return via;
     }
 
     public void iniciar() {
@@ -53,38 +86,52 @@ public class PruebaVehiculos extends JPanel {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         g2.setColor(Color.LIGHT_GRAY);
-        g2.drawLine(0, 85, 900, 85);
-        g2.drawLine(0, 115, 900, 115);
+        for (Via via : List.of(viaEntrada, viaBajada, viaTramoMedio, viaSubida, viaTramoFinal)) {
+            dibujarVia(g2, via);
+        }
 
         g2.setColor(Color.BLACK);
-        g2.fillOval(795, 80, 10, 10);  // bache 1
-        g2.fillOval(445, 110, 10, 10); // bache 2
+        g2.fillOval(120 - 5, 292 - 5, 10, 10);
+        g2.fillOval(480 - 5, 308 - 5, 10, 10);
+        g2.fillOval(820 - 5, 292 - 5, 10, 10);
 
         for (Vehiculo v : gestor.getVehiculos()) {
             dibujarVehiculo(g2, v);
         }
     }
 
-   private void dibujarVehiculo(Graphics2D g2, Vehiculo v) {
-    java.awt.Shape hitbox = v.getHitbox(); // ya viene rotado si esta cambiando de carril
-
-    if (v instanceof Bus) {
-        g2.setColor(Color.ORANGE);
-    } else if (v instanceof Moto) {
-        g2.setColor(Color.CYAN);
-    } else {
-        g2.setColor(Color.WHITE);
+    private void dibujarVia(Graphics2D g2, Via via) {
+        for (Carril c : via.getCarriles()) {
+            double[] p = c.getPuntoInicio();
+            List<Point2D> trazado = via.getTrazado();
+            Point2D fin = trazado.get(trazado.size() - 1);
+            double[] perp = c.getPerpendicular();
+            double fx = fin.getX() + perp[0] * c.getY();
+            double fy = fin.getY() + perp[1] * c.getY();
+            g2.drawLine((int) p[0], (int) p[1], (int) fx, (int) fy);
+        }
     }
 
-    if (v.isAveriado()) {
-        g2.setColor(Color.RED);
-    }
+    private void dibujarVehiculo(Graphics2D g2, Vehiculo v) {
+        Shape hitbox = v.getHitbox();
 
-    g2.fill(hitbox);
-}
+        if (v instanceof Bus) {
+            g2.setColor(Color.ORANGE);
+        } else if (v instanceof Moto) {
+            g2.setColor(Color.CYAN);
+        } else {
+            g2.setColor(Color.WHITE);
+        }
+
+        if (v.isAveriado()) {
+            g2.setColor(Color.RED);
+        }
+
+        g2.fill(hitbox);
+    }
 
     public static void main(String[] args) {
-        JFrame frame = new JFrame("Prueba GestorVehiculos");
+        JFrame frame = new JFrame("Prueba GestorVehiculos - mapa extenso");
         PruebaVehiculos panel = new PruebaVehiculos();
         frame.add(panel);
         frame.pack();

@@ -8,7 +8,12 @@ public class Carril {
     private Via via;
     private boolean sentidoIda; // true = va en la direccion normal del trazado, false = va al reves
     private List<Vehiculo> vehiculos;
-    private double offsetY; // que tan separado esta este carril del centro de la via
+    // Distancia lateral (perpendicular al trazado de la via) a la que esta este carril
+    // respecto al eje de la via. OJO: antes esto se usaba como si fuera una coordenada Y
+    // absoluta, lo cual solo funcionaba por casualidad en vias horizontales; ahora se
+    // combina con getPerpendicular() para que funcione con cualquier orientacion (ver
+    // getPuntoInicio()).
+    private double offsetY;
 
     public Carril(Via via, boolean sentidoIda) {
         this.via = via;
@@ -25,48 +30,79 @@ public class Carril {
     }
 
     public Vehiculo getVehiculoAdelante(Vehiculo referencia) {
-    double[] dir = getDireccion();
-    Vehiculo masCercano = null;
-    double menorDistancia = Double.MAX_VALUE;
+        double[] dir = getDireccion();
+        Vehiculo masCercano = null;
+        double menorDistancia = Double.MAX_VALUE;
 
-    for (Vehiculo v : vehiculos) {
-        if (v == referencia) continue;
-        double dx = v.getX() - referencia.getX();
-        double dy = v.getY() - referencia.getY();
-        double proyeccion = dx * dir[0] + dy * dir[1];
-        if (proyeccion > 0 && proyeccion < menorDistancia) {
-            masCercano = v;
-            menorDistancia = proyeccion;
-        }
-    }
-    return masCercano;
-}
-
-    // vector unitario hacia donde avanza este carril, segun el trazado de la via y su sentido
-public double[] getDireccion() {
-    List<java.awt.geom.Point2D> trazado = via.getTrazado();
-    java.awt.geom.Point2D inicio = trazado.get(0);
-    java.awt.geom.Point2D fin = trazado.get(trazado.size() - 1);
-    double dx = fin.getX() - inicio.getX();
-    double dy = fin.getY() - inicio.getY();
-    double largo = Math.hypot(dx, dy);
-    dx /= largo;
-    dy /= largo;
-    if (!sentidoIda) {
-        dx = -dx;
-        dy = -dy;
-    }
-    return new double[]{dx, dy};
-}
-    
-    // usado por la moto para saber si se puede filtrar
-    public double espacioLibreCerca(double x, double y) {
-        double masCercano = Double.MAX_VALUE;
         for (Vehiculo v : vehiculos) {
-            double dist = Math.abs(v.getX() - x);
-            if (dist < masCercano) masCercano = dist;
+            if (v == referencia) continue;
+            double dx = v.getX() - referencia.getX();
+            double dy = v.getY() - referencia.getY();
+            double proyeccion = dx * dir[0] + dy * dir[1];
+            if (proyeccion > 0 && proyeccion < menorDistancia) {
+                masCercano = v;
+                menorDistancia = proyeccion;
+            }
         }
         return masCercano;
+    }
+
+    // vector unitario hacia donde avanza este carril, segun el trazado de la via y su sentido
+    public double[] getDireccion() {
+        List<java.awt.geom.Point2D> trazado = via.getTrazado();
+        java.awt.geom.Point2D inicio = trazado.get(0);
+        java.awt.geom.Point2D fin = trazado.get(trazado.size() - 1);
+        double dx = fin.getX() - inicio.getX();
+        double dy = fin.getY() - inicio.getY();
+        double largo = Math.hypot(dx, dy);
+        dx /= largo;
+        dy /= largo;
+        if (!sentidoIda) {
+            dx = -dx;
+            dy = -dy;
+        }
+        return new double[]{dx, dy};
+    }
+
+    // usado por la moto para saber si se puede filtrar
+    // antes media solo la diferencia en X, lo que solo tenia sentido en vias horizontales;
+    // ahora proyecta sobre la direccion real del carril, asi sirve para cualquier orientacion.
+    public double espacioLibreCerca(double x, double y) {
+        double[] dir = getDireccion();
+        double masCercano = Double.MAX_VALUE;
+        for (Vehiculo v : vehiculos) {
+            double dx = v.getX() - x;
+            double dy = v.getY() - y;
+            double proyeccion = Math.abs(dx * dir[0] + dy * dir[1]);
+            if (proyeccion < masCercano) masCercano = proyeccion;
+        }
+        return masCercano;
+    }
+
+    /**
+     * Vector unitario perpendicular al trazado de la via (siempre calculado sobre el
+     * sentido "ida" del trazado, sin importar el sentido de este carril en particular),
+     * usado para separar carriles lateralmente sin importar si la via es horizontal,
+     * vertical o diagonal.
+     */
+    public double[] getPerpendicular() {
+        List<java.awt.geom.Point2D> trazado = via.getTrazado();
+        java.awt.geom.Point2D inicio = trazado.get(0);
+        java.awt.geom.Point2D fin = trazado.get(trazado.size() - 1);
+        double dx = fin.getX() - inicio.getX();
+        double dy = fin.getY() - inicio.getY();
+        double largo = Math.hypot(dx, dy);
+        dx /= largo;
+        dy /= largo;
+        return new double[]{-dy, dx};
+    }
+
+    /** Punto real (x,y) donde nace este carril: el extremo de la via que le toca segun su sentido, desplazado lateralmente por offsetY. */
+    public double[] getPuntoInicio() {
+        List<java.awt.geom.Point2D> trazado = via.getTrazado();
+        java.awt.geom.Point2D base = sentidoIda ? trazado.get(0) : trazado.get(trazado.size() - 1);
+        double[] perp = getPerpendicular();
+        return new double[]{base.getX() + perp[0] * offsetY, base.getY() + perp[1] * offsetY};
     }
 
     public double getY() { return offsetY; }

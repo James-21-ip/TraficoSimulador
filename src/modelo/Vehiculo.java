@@ -1,172 +1,230 @@
-// Vehiculo.java
-package modelo;
+    package modelo;
 
-public abstract class Vehiculo {
+    public abstract class Vehiculo {
 
-    protected double x;
-    protected double y;
-    protected double velocidad;
-    protected double velocidadMaxima;
-    protected double aceleracion;
-    protected double ancho;
-    protected double largo;
-    protected Carril carril;
-    protected boolean estaAveriado;
-    protected double tiempoAveriaRestante;
+        protected double x;
+        protected double y;
+        protected double velocidad;
+        protected double velocidadMaxima;
+        protected double aceleracion;
+        protected double ancho;
+        protected double largo;
+        protected Carril carril;
+        protected boolean estaAveriado;
+        protected double tiempoAveriaRestante;
+        private double tiempoDesdeUltimoCambio = 999;
+    private static final double COOLDOWN_CAMBIO_CARRIL = 2.0;
+    private static final double COOLDOWN_EVASION_BACHE = 0.5;
 
-    private boolean cambiandoCarril = false;
-    private double yObjetivo;
-    private double angulo = 0;
-    private static final double VELOCIDAD_CAMBIO_LATERAL = 40; // px/seg
-    private static final double INCLINACION_MAX = 15; // grados
+        private boolean cambiandoCarril = false;
+        private double lateralRestante;
+        private double[] perpendicularCambio;
 
-    public Vehiculo(double x, double y, Carril carril) {
-        this.x = x;
-        this.y = y;
-        this.carril = carril;
-        this.velocidad = 0;
-        this.estaAveriado = false;
-    }
+        private double anguloBase = 0;   // orientacion real segun la via/carril actual
+        private double inclinacion = 0;  // offset temporal por el "lean" al cambiar de carril
+        private boolean decisionGiroTomada = false; // evita tirar el dado del giro en cada tick
 
-    protected abstract void definirCaracteristicas();
+        private static final double VELOCIDAD_CAMBIO_LATERAL = 40;
+        private static final double INCLINACION_MAX = 15;
 
-    /** Atajo para cuando no hay semáforo/puente que considerar (ej. PruebaVehiculos). */
-    public void mover(Vehiculo vehiculoAdelante, double deltaTime) {
-        mover(vehiculoAdelante, null, deltaTime);
-    }
+        public Vehiculo(double x, double y, Carril carril) {
+            this.x = x;
+            this.y = y;
+            this.carril = carril;
+            this.velocidad = 0;
+            this.estaAveriado = false;
+            actualizarAnguloBase();
+        }
 
-    /**
-     * @param distanciaHastaParada distancia hasta un semáforo en rojo/ámbar o un
-     *        puente ocupado que está en la vía de este vehículo; null si no hay
-     *        ninguno (o si ya está en verde / el puente está libre).
-     */
-    public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada, double deltaTime) {
-        if (estaAveriado) {
-            tiempoAveriaRestante -= deltaTime;
-            if (tiempoAveriaRestante <= 0) {
-                estaAveriado = false;
+        protected abstract void definirCaracteristicas();
+
+        public void mover(Vehiculo vehiculoAdelante, double deltaTime) {
+            mover(vehiculoAdelante, null, deltaTime);
+        }
+
+        public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada, double deltaTime) {
+            actualizarAnguloBase(); // aunque este averiado, sigue "mirando" hacia donde iba
+            tiempoDesdeUltimoCambio += deltaTime;
+            if (estaAveriado) {
+                tiempoAveriaRestante -= deltaTime;
+                if (tiempoAveriaRestante <= 0) {
+                    estaAveriado = false;
+                }
+                return;
             }
-            return;
+
+            if (cambiandoCarril) {
+                avanzarCambioCarril(deltaTime);
+            }
+
+            double margenMinimo = 10;
+
+            double distanciaSeguraVehiculo = velocidad * 1.5 + margenMinimo;
+            if (vehiculoAdelante != null) {
+                distanciaSeguraVehiculo += largo / 2 + vehiculoAdelante.largo / 2;
+            }
+            double distanciaLibreVehiculo = (vehiculoAdelante != null)
+                    ? distanciaHacia(vehiculoAdelante)
+                    : Double.MAX_VALUE;
+
+            double distanciaSeguraParada = velocidad * 1.5 + margenMinimo + largo / 2;
+            double distanciaLibreParada = (distanciaHastaParada != null)
+                    ? distanciaHastaParada
+                    : Double.MAX_VALUE;
+
+            boolean debeFrenar = distanciaLibreVehiculo < distanciaSeguraVehiculo
+                    || distanciaLibreParada < distanciaSeguraParada;
+
+            if (debeFrenar) {
+                velocidad = Math.max(0, velocidad - aceleracion * 2 * deltaTime);
+            } else if (velocidad < velocidadMaxima) {
+                velocidad = Math.min(velocidadMaxima, velocidad + aceleracion * deltaTime);
+            }
+
+            double[] direccion = carril.getDireccion();
+            x += direccion[0] * velocidad * deltaTime;
+            y += direccion[1] * velocidad * deltaTime;
         }
 
-        if (cambiandoCarril) {
-            avanzarCambioCarril(deltaTime);
+        private void actualizarAnguloBase() {
+            double[] dir = carril.getDireccion();
+            anguloBase = Math.toDegrees(Math.atan2(dir[1], dir[0]));
         }
 
-        double margenMinimo = 10;
-
-        // frenado por el vehículo de adelante (igual que antes)
-        double distanciaSeguraVehiculo = velocidad * 1.5 + margenMinimo;
-        if (vehiculoAdelante != null) {
-            distanciaSeguraVehiculo += largo / 2 + vehiculoAdelante.largo / 2;
-        }
-        double distanciaLibreVehiculo = (vehiculoAdelante != null)
-                ? distanciaHacia(vehiculoAdelante)
-                : Double.MAX_VALUE;
-
-        // frenado por semáforo en rojo / puente ocupado (nuevo)
-        double distanciaSeguraParada = velocidad * 1.5 + margenMinimo + largo / 2;
-        double distanciaLibreParada = (distanciaHastaParada != null)
-                ? distanciaHastaParada
-                : Double.MAX_VALUE;
-
-        boolean debeFrenar = distanciaLibreVehiculo < distanciaSeguraVehiculo
-                || distanciaLibreParada < distanciaSeguraParada;
-
-        if (debeFrenar) {
-            velocidad = Math.max(0, velocidad - aceleracion * 2 * deltaTime);
-        } else if (velocidad < velocidadMaxima) {
-            velocidad = Math.min(velocidadMaxima, velocidad + aceleracion * deltaTime);
+        protected double distanciaHacia(Vehiculo otro) {
+            return Math.hypot(otro.x - this.x, otro.y - this.y);
         }
 
-        double[] direccion = carril.getDireccion();
-        x += direccion[0] * velocidad * deltaTime;
-        y += direccion[1] * velocidad * deltaTime;
-    }
+        public void frenarEnSeco() {
+            velocidad = 0;
+        }
 
-    protected double distanciaHacia(Vehiculo otro) {
-        return Math.hypot(otro.x - this.x, otro.y - this.y);
-    }
+        public void averiar(double duracion) {
+            estaAveriado = true;
+            tiempoAveriaRestante = duracion;
+            velocidad = 0;
+        }
 
-    public void frenarEnSeco() {
-        velocidad = 0;
-    }
+        public boolean isAveriado() {
+            return estaAveriado;
+        }
 
-    public void averiar(double duracion) {
-        estaAveriado = true;
-        tiempoAveriaRestante = duracion;
-        velocidad = 0;
-    }
+        public void reducirVelocidadPorBache(double severidad) {
+            velocidad *= (1 - severidad);
+        }
 
-    public boolean isAveriado() {
-        return estaAveriado;
-    }
+     public void intentarCambiarCarrilPorCongestion(Vehiculo adelante, Carril carrilVecino) {
+        if (cambiandoCarril || carrilVecino == null || tiempoDesdeUltimoCambio < COOLDOWN_CAMBIO_CARRIL) return;
 
-    public void reducirVelocidadPorBache(double severidad) {
-        velocidad *= (1 - severidad);
-    }
+        boolean atascado = velocidad < 5 && adelante != null
+                && distanciaHacia(adelante) < (largo / 2 + adelante.largo / 2 + 15);
 
-    public void intentarCambiarCarrilPorCongestion(Vehiculo adelante, Carril carrilVecino) {
-        if (cambiandoCarril || carrilVecino == null) return;
-        boolean atascado = velocidad < 5 && adelante != null && distanciaHacia(adelante) < 40;
         if (!atascado) return;
         if (carrilVecino.espacioLibreCerca(x, y) > largo + 10) {
             iniciarCambioCarril(carrilVecino);
         }
     }
 
-    public void intentarEvadirBache(Bache bache, Carril carrilVecino, double distanciaDeteccion) {
-        if (cambiandoCarril || carrilVecino == null) return;
-        if (!bacheEnCamino(bache, distanciaDeteccion)) return;
-        if (carrilVecino.espacioLibreCerca(x, y) > largo + 10) {
-            iniciarCambioCarril(carrilVecino);
-        }
-    }
+        public void intentarEvadirBache(Bache bache, Carril carrilVecino, double distanciaDeteccion) {
+        if (cambiandoCarril || carrilVecino == null || tiempoDesdeUltimoCambio < COOLDOWN_EVASION_BACHE) return;
 
-    private boolean bacheEnCamino(Bache b, double distanciaDeteccion) {
-        double[] dir = carril.getDireccion();
-        double dx = b.getX() - x;
-        double dy = b.getY() - y;
-        double proyeccion = dx * dir[0] + dy * dir[1];
-        double lateral = Math.abs(dx * dir[1] - dy * dir[0]);
-        return proyeccion > 0 && proyeccion < distanciaDeteccion && lateral < ancho + 5;
-    }
+            if (!bacheEnCamino(bache, distanciaDeteccion)) return;
+            if (carrilVecino.espacioLibreCerca(x, y) > largo + 10) {
+                iniciarCambioCarril(carrilVecino);
+            }
+        }   
 
-    private void iniciarCambioCarril(Carril nuevo) {
-        carril.quitarVehiculo(this);
-        nuevo.agregarVehiculo(this);
-        carril = nuevo;
-        yObjetivo = nuevo.getY();
-        cambiandoCarril = true;
-    }
+       private boolean bacheEnCamino(Bache b, double distanciaDeteccion) {
+    double[] dir = carril.getDireccion();
+    double[] perp = carril.getPerpendicular();
+    java.util.List<java.awt.geom.Point2D> trazado = carril.getVia().getTrazado();
+    java.awt.geom.Point2D inicio = trazado.get(0);
 
-    private void avanzarCambioCarril(double deltaTime) {
-        double restante = yObjetivo - y;
-        double paso = VELOCIDAD_CAMBIO_LATERAL * deltaTime;
+    // posicion lateral del bache respecto al eje central de la via (no del vehiculo)
+    double dxBache = b.getX() - inicio.getX();
+    double dyBache = b.getY() - inicio.getY();
+    double offsetLateralBache = dxBache * perp[0] + dyBache * perp[1];
 
-        if (Math.abs(restante) <= paso) {
-            y = yObjetivo;
-            cambiandoCarril = false;
-            angulo = 0;
-        } else {
-            double dir = Math.signum(restante);
-            y += dir * paso;
-            angulo = dir * INCLINACION_MAX;
-        }
-    }
+    // el bache solo "pertenece" a este carril si esta cerca de SU offset, no del de al lado
+    boolean mismoCarril = Math.abs(offsetLateralBache - carril.getY()) < ancho / 2 + 3;
+    if (!mismoCarril) return false;
 
-    public java.awt.Shape getHitbox() {
-        java.awt.geom.Rectangle2D rect =
-                new java.awt.geom.Rectangle2D.Double(x - largo / 2, y - ancho / 2, largo, ancho);
-        if (angulo == 0) return rect;
-        java.awt.geom.AffineTransform t =
-                java.awt.geom.AffineTransform.getRotateInstance(Math.toRadians(angulo), x, y);
-        return t.createTransformedShape(rect);
-    }
-
-    public double getX() { return x; }
-    public double getY() { return y; }
-    public double getVelocidad() { return velocidad; }
-    public double getAngulo() { return angulo; }
-    public Carril getCarril() { return carril; }
+    double dx = b.getX() - x;
+    double dy = b.getY() - y;
+    double proyeccion = dx * dir[0] + dy * dir[1];
+    return proyeccion > 0 && proyeccion < distanciaDeteccion;
 }
+       private void iniciarCambioCarril(Carril nuevo) {
+    double offsetActual = carril.getY();
+    carril.quitarVehiculo(this);
+    nuevo.agregarVehiculo(this);
+    double offsetNuevo = nuevo.getY();
+    carril = nuevo;
+
+    perpendicularCambio = nuevo.getPerpendicular();
+    lateralRestante = offsetNuevo - offsetActual;
+    cambiandoCarril = true;
+    tiempoDesdeUltimoCambio = 0; // <-- esta es la que faltaba
+}
+
+        private void avanzarCambioCarril(double deltaTime) {
+            double paso = VELOCIDAD_CAMBIO_LATERAL * deltaTime;
+
+            if (Math.abs(lateralRestante) <= paso) {
+                x += perpendicularCambio[0] * lateralRestante;
+                y += perpendicularCambio[1] * lateralRestante;
+                lateralRestante = 0;
+                cambiandoCarril = false;
+                inclinacion = 0;
+            } else {
+                double dir = Math.signum(lateralRestante);
+                x += perpendicularCambio[0] * dir * paso;
+                y += perpendicularCambio[1] * dir * paso;
+                lateralRestante -= dir * paso;
+                inclinacion = dir * INCLINACION_MAX;
+            }
+        }
+
+        /** Salta a otra vía (giro en una intersección). Instantáneo: aparece en el punto de entrada del carril nuevo, ya orientado hacia su nueva dirección. */
+        public void girarHaciaVia(Carril nuevoCarril) {
+            carril.quitarVehiculo(this);
+            nuevoCarril.agregarVehiculo(this);
+            carril = nuevoCarril;
+
+            double[] punto = nuevoCarril.getPuntoInicio();
+            x = punto[0];
+            y = punto[1];
+
+            actualizarAnguloBase();
+            inclinacion = 0;
+            cambiandoCarril = false;
+            decisionGiroTomada = false; // en la via nueva, todavia no decidio nada
+        }
+
+        public boolean isDecisionGiroTomada() { return decisionGiroTomada; }
+        public void marcarDecisionGiroTomada() { decisionGiroTomada = true; }
+
+        public void retroceder(double[] direccion, double distancia) {
+            x -= direccion[0] * distancia;
+            y -= direccion[1] * distancia;
+        }
+
+        /** Hitbox rotado segun la orientacion REAL del vehiculo (via + cambio de carril en curso), no solo horizontal. */
+        public java.awt.Shape getHitbox() {
+            java.awt.geom.Rectangle2D rect =
+                    new java.awt.geom.Rectangle2D.Double(x - largo / 2, y - ancho / 2, largo, ancho);
+            double anguloTotal = getAngulo();
+            if (anguloTotal == 0) return rect;
+            java.awt.geom.AffineTransform t =
+                    java.awt.geom.AffineTransform.getRotateInstance(Math.toRadians(anguloTotal), x, y);
+            return t.createTransformedShape(rect);
+        }
+
+        public double getX() { return x; }
+        public double getY() { return y; }
+        public double getLargo() { return largo; }
+        public double getAncho() { return ancho; }
+        public double getVelocidad() { return velocidad; }
+        public double getAngulo() { return anguloBase + inclinacion; }
+        public Carril getCarril() { return carril; }
+    }

@@ -1,4 +1,3 @@
-// GestorVehiculos.java
 package gestor;
 
 import modelo.*;
@@ -13,8 +12,13 @@ public class GestorVehiculos {
     private List<Puente> puentes;
     private Random random;
     private Set<String> bachesYaAplicados = new HashSet<>();
+    
+
     private static final double DISTANCIA_DETECCION_BACHE = 60;
     private static final double DISTANCIA_LINEA_PARADA = 15;
+    private static final double MARGEN_SALIDA = 100;
+    private static final double UMBRAL_DECISION_GIRO = 25; // que tan cerca del final de la via se decide el giro
+    private static final double PROBABILIDAD_GIRAR = 0.5;  // si hay conexiones, mitad de las veces gira, mitad sigue derecho (y sale del mapa)
 
     public GestorVehiculos() {
         vehiculos = new ArrayList<>();
@@ -24,28 +28,19 @@ public class GestorVehiculos {
         random = new Random();
     }
 
-    public void setBaches(List<Bache> baches) {
-        this.baches = baches;
-    }
-
-    /** Cruces cuyos semáforos deben poder detener a estos vehículos. */
-    public void setCruces(List<Cruce> cruces) {
-        this.cruces = cruces;
-    }
-
-    /** Puentes que estos vehículos deben respetar (esperar si están ocupados). */
-    public void setPuentes(List<Puente> puentes) {
-        this.puentes = puentes;
-    }
+    public void setBaches(List<Bache> baches) { this.baches = baches; }
+    public void setCruces(List<Cruce> cruces) { this.cruces = cruces; }
+    public void setPuentes(List<Puente> puentes) { this.puentes = puentes; }
 
     public void intentarSpawn(Via viaEntrada, double lambda, double deltaTime) {
         for (Carril carril : viaEntrada.getCarriles()) {
             double probabilidad = 1 - Math.exp(-lambda * deltaTime);
             if (random.nextDouble() < probabilidad) {
-                double xInicial = viaEntrada.getTrazado().get(0).getX();
-                double yInicial = carril.getY();
+                double[] puntoInicio = carril.getPuntoInicio();
+                double xInicial = puntoInicio[0];
+                double yInicial = puntoInicio[1];
 
-                if (!hayEspacioParaSpawnear(carril, xInicial)) {
+                if (!hayEspacioParaSpawnear(carril, xInicial, yInicial)) {
                     continue;
                 }
 
@@ -56,10 +51,10 @@ public class GestorVehiculos {
         }
     }
 
-    private boolean hayEspacioParaSpawnear(Carril carril, double xInicial) {
+    private boolean hayEspacioParaSpawnear(Carril carril, double xInicial, double yInicial) {
         double distanciaMinima = 80;
         for (Vehiculo v : carril.getVehiculos()) {
-            if (Math.abs(v.getX() - xInicial) < distanciaMinima) {
+            if (Math.hypot(v.getX() - xInicial, v.getY() - yInicial) < distanciaMinima) {
                 return false;
             }
         }
@@ -85,14 +80,105 @@ public class GestorVehiculos {
         }
         aplicarEvasionBaches();
         aplicarCambiosPorCongestion();
+        aplicarGirosEnIntersecciones();
         procesarBaches();
         detectarColisiones();
         sincronizarColasDeCruces();
+        eliminarVehiculosFueraDeRango();
     }
 
-    // ---------- integración con semáforos y puentes ----------
+    // ---------- giros en intersecciones (nuevo) ----------
 
-    /** Devuelve la distancia hasta el punto donde este vehículo debe frenar, o null si puede seguir. */
+    private void aplicarGirosEnIntersecciones() {
+        for (Vehiculo v : vehiculos) {
+            Via via = v.getCarril().getVia();
+            List<Via> conexiones = via.getConexiones();
+            if (conexiones.isEmpty() || v.isDecisionGiroTomada()) continue;
+
+            double avance = avanceEnVia(v, via);
+            double largoVia = largoDeVia(via);
+
+           if (avance >= largoVia - UMBRAL_DECISION_GIRO) {
+    v.marcarDecisionGiroTomada();
+
+   Via destino = conexiones.get(random.nextInt(conexiones.size()));
+Carril entrada = elegirCarrilEntrada(via, v.getCarril(), destino);
+    if (entrada != null) {
+        v.girarHaciaVia(entrada);
+    }
+}
+        }
+    }
+
+    private Carril elegirCarrilEntrada(Via origen, Carril carrilOrigen, Via destino) {
+    List<Carril> candidatos = new ArrayList<>();
+    for (Carril c : destino.getCarriles()) {
+        if (c.isSentidoIda()) candidatos.add(c);
+    }
+    if (candidatos.isEmpty()) return null;
+
+    List<Carril> propiosMismoSentido = new ArrayList<>();
+    for (Carril c : origen.getCarriles()) {
+        if (c.isSentidoIda() == carrilOrigen.isSentidoIda()) propiosMismoSentido.add(c);
+    }
+    int indice = propiosMismoSentido.indexOf(carrilOrigen);
+    indice = Math.max(0, Math.min(indice, candidatos.size() - 1));
+
+    return candidatos.get(indice);
+}
+
+    // ---------- despawn ----------
+
+    private void eliminarVehiculosFueraDeRango() {
+        Iterator<Vehiculo> it = vehiculos.iterator();
+        while (it.hasNext()) {
+            Vehiculo v = it.next();
+            if (haSalidoDeLaVia(v)) {
+                liberarPuenteSiCorresponde(v);
+                v.getCarril().quitarVehiculo(v);
+                it.remove();
+                limpiarBachesAplicados(v);
+            }
+        }
+    }
+
+    private boolean haSalidoDeLaVia(Vehiculo v) {
+        Via via = v.getCarril().getVia();
+        return avanceEnVia(v, via) > largoDeVia(via) + MARGEN_SALIDA;
+    }
+
+    private double avanceEnVia(Vehiculo v, Via via) {
+        List<Point2D> trazado = via.getTrazado();
+        Point2D inicio = trazado.get(0);
+        double[] dir = v.getCarril().getDireccion();
+        double dx = v.getX() - inicio.getX();
+        double dy = v.getY() - inicio.getY();
+        return dx * dir[0] + dy * dir[1];
+    }
+
+    private double largoDeVia(Via via) {
+        List<Point2D> trazado = via.getTrazado();
+        Point2D inicio = trazado.get(0);
+        Point2D fin = trazado.get(trazado.size() - 1);
+        return inicio.distance(fin);
+    }
+
+    // se llama justo antes de remover un vehiculo: si era el que estaba cruzando un puente, lo libera
+    private void liberarPuenteSiCorresponde(Vehiculo v) {
+        for (Puente puente : puentes) {
+            if (puente.getVehiculoCruzando() == v) {
+                puente.terminarCruce();
+            }
+        }
+    }
+
+    private void limpiarBachesAplicados(Vehiculo v) {
+        String prefijo = System.identityHashCode(v) + "-";
+        bachesYaAplicados.removeIf(clave -> clave.startsWith(prefijo));
+    }
+
+    // ---------- semaforos y puentes ----------
+
     private Double calcularDistanciaParada(Vehiculo v) {
         Via via = v.getCarril().getVia();
 
@@ -126,7 +212,6 @@ public class GestorVehiculos {
         return Math.hypot(fin.getX() - v.getX(), fin.getY() - v.getY());
     }
 
-    /** Mantiene la cola de espera de cada acceso (para el semáforo adaptativo) al día con los vehículos reales. */
     private void sincronizarColasDeCruces() {
         for (Cruce cruce : cruces) {
             List<Cruce.Acceso> accesos = cruce.getAccesos();
@@ -149,13 +234,18 @@ public class GestorVehiculos {
         }
     }
 
-    // ---------- el resto, igual que ya lo tenías ----------
+    // ---------- carriles, baches, colisiones ----------
 
     private Carril carrilVecino(Carril actual) {
         List<Carril> carriles = actual.getVia().getCarriles();
         int idx = carriles.indexOf(actual);
-        if (idx + 1 < carriles.size()) return carriles.get(idx + 1);
-        if (idx - 1 >= 0) return carriles.get(idx - 1);
+
+        if (idx + 1 < carriles.size() && carriles.get(idx + 1).isSentidoIda() == actual.isSentidoIda()) {
+            return carriles.get(idx + 1);
+        }
+        if (idx - 1 >= 0 && carriles.get(idx - 1).isSentidoIda() == actual.isSentidoIda()) {
+            return carriles.get(idx - 1);
+        }
         return null;
     }
 
@@ -190,6 +280,7 @@ public class GestorVehiculos {
         }
     }
 
+    // vuelve a usar Area (forma real, rotada), en vez del bounding box aproximado
     private void detectarColisiones() {
         for (int i = 0; i < vehiculos.size(); i++) {
             for (int j = i + 1; j < vehiculos.size(); j++) {
@@ -209,6 +300,22 @@ public class GestorVehiculos {
     private void manejarColision(Vehiculo a, Vehiculo b) {
         a.frenarEnSeco();
         b.frenarEnSeco();
+        separarVehiculos(a, b);
+    }
+
+    private void separarVehiculos(Vehiculo a, Vehiculo b) {
+        double[] dir = a.getCarril().getDireccion();
+        double proyeccion = (b.getX() - a.getX()) * dir[0] + (b.getY() - a.getY()) * dir[1];
+        Vehiculo atras = proyeccion >= 0 ? a : b;
+        Vehiculo adelante = proyeccion >= 0 ? b : a;
+
+        double distanciaActual = Math.hypot(b.getX() - a.getX(), b.getY() - a.getY());
+        double distanciaMinima = adelante.getLargo() / 2 + atras.getLargo() / 2 + 2;
+        double faltante = distanciaMinima - distanciaActual;
+
+        if (faltante > 0) {
+            atras.retroceder(dir, faltante);
+        }
     }
 
     public List<Vehiculo> getVehiculos() {

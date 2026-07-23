@@ -10,6 +10,7 @@ public class Via {
     private List<Carril> carriles;
     private boolean dobleSentido;
     private double velocidadMaxima;
+    private List<Via> conexiones = new ArrayList<>(); // a que otras vias se puede continuar al llegar al final
 
     public Via(List<Point2D> trazado, int numCarriles, boolean dobleSentido, double velocidadMaxima) {
         this.trazado = trazado;
@@ -23,6 +24,11 @@ public class Via {
         }
     }
 
+    public void agregarConexion(Via destino) {
+        conexiones.add(destino);
+    }
+
+    public List<Via> getConexiones() { return conexiones; }
     public List<Point2D> getTrazado() { return trazado; }
     public List<Carril> getCarriles() { return carriles; }
     public boolean isDobleSentido() { return dobleSentido; }
