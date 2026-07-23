@@ -1,16 +1,5 @@
 package vista;
 
-import modelo.Bache;
-import modelo.Bus;
-import modelo.Carril;
-import modelo.Cruce;
-import modelo.Moto;
-import modelo.Puente;
-import modelo.Semaforo;
-import modelo.Vehiculo;
-import modelo.Via;
-
-import javax.swing.JPanel;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics;
@@ -26,6 +15,16 @@ import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import javax.swing.JPanel;
+import modelo.Bache;
+import modelo.Bus;
+import modelo.Carril;
+import modelo.Cruce;
+import modelo.Moto;
+import modelo.Puente;
+import modelo.Semaforo;
+import modelo.Vehiculo;
+import modelo.Via;
 
 /**
  * Dibuja el estado de la simulación con Graphics2D: vías, cruces con
@@ -155,10 +154,13 @@ public class PanelSimulacion extends JPanel {
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
+        //DECORACION ESTATICA
         dibujarRioDecorativo(g2);
         dibujarEdificiosYParque(g2);
-        dibujarCalzadas(g2);
         dibujarOtroLadoCalle(g2);
+
+        dibujarCalzadas(g2);
+
 
         for (Via via : vias) {
             dibujarLineaCentral(g2, via);
@@ -252,14 +254,31 @@ public class PanelSimulacion extends JPanel {
         g2.fill(new Ellipse2D.Double(xFin - 26, Y_AVENIDA - 26, 52, 52));
     }
 
-    // ---------- calzadas ----------
+    // ---------- calzadas dinamic ----------
 
     private void dibujarCalzadas(Graphics2D g2) {
-        dibujarBandaVial(g2, 40, Y_AVENIDA - 26, MAPA_ANCHO - 40, 52);
-        dibujarBandaVial(g2, X_CRUCE_1 - 26, 40, 52, MAPA_ALTO - 40);
-        dibujarBandaVial(g2, X_CRUCE_2 - 26, 40, 52, MAPA_ALTO - 40);
-    }
+        for (Via via : vias) {
+            List<Point2D> trazado = via.getTrazado();
+            if (trazado.size() < 2) continue;
 
+            Point2D inicio = trazado.get(0);
+            Point2D fin = trazado.get(trazado.size() - 1);
+
+            // Calculamos el grosor visual basado en la cantidad de carriles
+            float grosorAsfalto = via.getCarriles().size() * 52f; 
+            float grosorVereda = grosorAsfalto + 12f;
+
+            // 1. Dibujar la vereda (línea gruesa de fondo)
+            g2.setColor(COLOR_VEREDA);
+            g2.setStroke(new BasicStroke(grosorVereda, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND));
+            g2.draw(new Line2D.Double(inicio, fin));
+
+            // 2. Dibujar el asfalto (línea central superpuesta)
+            g2.setColor(COLOR_ASFALTO);
+            g2.setStroke(new BasicStroke(grosorAsfalto, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND));
+            g2.draw(new Line2D.Double(inicio, fin));
+        }
+    }
     private void dibujarBandaVial(Graphics2D g2, double x, double y, double ancho, double alto) {
         int veredaGrosor = 6;
         g2.setColor(COLOR_VEREDA);
