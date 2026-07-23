@@ -1,16 +1,19 @@
 package vista;
 
-import fichero.ArchivoMapa;
 import gestor.GestorCruces;
 import gestor.GestorVehiculos;
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import java.awt.geom.Point2D;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Queue;
-import java.util.Random;
+import modelo.Auto;
+import modelo.Bache;
+import modelo.Bus;
+import modelo.Carril;
+import modelo.Cruce;
+import modelo.Moto;
+import modelo.Puente;
+import modelo.Semaforo;
+import modelo.Vehiculo;
+import modelo.Via;
+import modelo.ZonaCruce;
+
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -19,18 +22,14 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSlider;
 import javax.swing.Timer;
-import modelo.Auto;
-import modelo.Bache;
-import modelo.Bus;
-import modelo.Carril;
-import modelo.Cruce;
-import modelo.Entrada;
-import modelo.Moto;
-import modelo.Puente;
-import modelo.Semaforo;
-import modelo.Vehiculo;
-import modelo.Via;
-import modelo.ZonaCruce;
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.geom.Point2D;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Queue;
+import java.util.Random;
 
 /**
  * Ventana principal: arma el mapa (avenida + 2 calles + 2 cruces + baches),
@@ -52,7 +51,6 @@ import modelo.ZonaCruce;
  * Puente + GestorCruces, sin tocar esas clases.
  */
 public class VentanaPrincipal extends JFrame {
-    private List<Entrada> entradas;
 
     private static final int TICK_MS = 50; // 20 ticks por segundo
 
@@ -74,6 +72,7 @@ public class VentanaPrincipal extends JFrame {
     private List<Puente> puentesDemo;
     private List<Bache> baches;
 
+    private final List<Entrada> entradas = new ArrayList<>();
 
     private Puente puenteDemo;
 
@@ -89,31 +88,110 @@ public class VentanaPrincipal extends JFrame {
         iniciarLoopSimulacion();
     }
 
-    // ---------- mapa real: avenida + 2 calles + 2 cruces ----------
-    private void construirMapa() {
-        ArchivoMapa lector = new ArchivoMapa();
-        
-        // Le indicamos que busque dentro del paquete 'mapas'
-        lector.cargarMapa("/mapas/mapa.txt");
+    /** Una vía de entrada al mapa, con su tasa de aparición (lambda de Poisson). */
+    private static class Entrada {
+        final Via via;
+        final double lambda;
+        Entrada(Via via, double lambda) { this.via = via; this.lambda = lambda; }
+    }
 
-        this.vias = lector.getVias();
-        this.cruces = lector.getCruces();
-        this.baches = lector.getBaches();
-        this.entradas = lector.getEntradas();
+    // ---------- mapa real: avenida + 2 calles + 2 cruces ----------
+
+    // separación (offsetY del carril) del carril rápido y del carril lento respecto
+    // al eje central de la calle; ver crearViaHorizontal/crearViaVertical más abajo.
+    private static final double OFFSET_RAPIDO = 12;
+    private static final double OFFSET_LENTO = 30;
+
+    private void construirMapa() {
+        int mitadCebra = 42; // debe coincidir con el tamaño de la ZonaCruce en PanelSimulacion
+
+        // avenida, sentido este (entra por el oeste, cruza cruce1 y cruce2, sale por el este)
+        // las vías terminan justo antes de la cebra: ahí es donde de verdad se detiene el auto.
+        // cada vía ahora tiene 2 carriles (rápido + lento) para el mismo sentido: así el motor
+        // de vehículos (que ya sabe cambiar de carril por congestión, sin tocarlo) puede adelantar.
+        Via avE1 = crearViaHorizontal(40, Y_AVENIDA, X_CRUCE_1 - mitadCebra, Y_AVENIDA);
+        Via avE2 = crearViaHorizontal(X_CRUCE_1 + mitadCebra, Y_AVENIDA, X_CRUCE_2 - mitadCebra, Y_AVENIDA);
+        Via avE3 = crearViaHorizontal(X_CRUCE_2 + mitadCebra, Y_AVENIDA, MAPA_ANCHO - 20, Y_AVENIDA);
+        avE1.agregarConexion(avE2);
+        avE2.agregarConexion(avE3);
+
+        // avenida, sentido oeste (entra por el este, cruza cruce2 y cruce1, sale por el oeste)
+        Via avW1 = crearViaHorizontal(MAPA_ANCHO - 20, Y_AVENIDA, X_CRUCE_2 + mitadCebra, Y_AVENIDA);
+        Via avW2 = crearViaHorizontal(X_CRUCE_2 - mitadCebra, Y_AVENIDA, X_CRUCE_1 + mitadCebra, Y_AVENIDA);
+        Via avW3 = crearViaHorizontal(X_CRUCE_1 - mitadCebra, Y_AVENIDA, 40, Y_AVENIDA);
+        avW1.agregarConexion(avW2);
+        avW2.agregarConexion(avW3);
+
+        // calle 1 (cruza en cruce1): sentido sur y sentido norte, también con carril rápido/lento
+        Via c1S1 = crearViaVertical(X_CRUCE_1, 40, X_CRUCE_1, Y_AVENIDA - mitadCebra);
+        Via c1S2 = crearViaVertical(X_CRUCE_1, Y_AVENIDA + mitadCebra, X_CRUCE_1, MAPA_ALTO - 20);
+        c1S1.agregarConexion(c1S2);
+        Via c1N1 = crearViaVertical(X_CRUCE_1, MAPA_ALTO - 20, X_CRUCE_1, Y_AVENIDA + mitadCebra);
+        Via c1N2 = crearViaVertical(X_CRUCE_1, Y_AVENIDA - mitadCebra, X_CRUCE_1, 40);
+        c1N1.agregarConexion(c1N2);
+
+        // calle 2 (cruza en cruce2): sentido sur y sentido norte
+        Via c2S1 = crearViaVertical(X_CRUCE_2, 40, X_CRUCE_2, Y_AVENIDA - mitadCebra);
+        Via c2S2 = crearViaVertical(X_CRUCE_2, Y_AVENIDA + mitadCebra, X_CRUCE_2, MAPA_ALTO - 20);
+        c2S1.agregarConexion(c2S2);
+        Via c2N1 = crearViaVertical(X_CRUCE_2, MAPA_ALTO - 20, X_CRUCE_2, Y_AVENIDA + mitadCebra);
+        Via c2N2 = crearViaVertical(X_CRUCE_2, Y_AVENIDA - mitadCebra, X_CRUCE_2, 40);
+        c2N1.agregarConexion(c2N2);
+
+        Cruce cruce1 = crearCruce(X_CRUCE_1, Y_AVENIDA, mitadCebra, avE1, avW2, c1S1, c1N1);
+        Cruce cruce2 = crearCruce(X_CRUCE_2, Y_AVENIDA, mitadCebra, avE2, avW1, c2S1, c2N1);
+
+        vias = new ArrayList<>(Arrays.asList(
+                avE1, avE2, avE3, avW1, avW2, avW3,
+                c1S1, c1S2, c1N1, c1N2, c2S1, c2S2, c2N1, c2N2));
+        cruces = new ArrayList<>(Arrays.asList(cruce1, cruce2));
+
+        // los baches van sobre el carril rápido de cada sentido (ver configurarCarrilesHorizontal/Vertical)
+        baches = new ArrayList<>(Arrays.asList(
+                new Bache((X_CRUCE_1 + X_CRUCE_2) / 2.0, Y_AVENIDA - OFFSET_RAPIDO, 0.5),
+                new Bache((X_CRUCE_1 + X_CRUCE_2) / 2.0, Y_AVENIDA + OFFSET_RAPIDO, 0.6),
+                new Bache(X_CRUCE_1 - OFFSET_RAPIDO, 220, 0.4)));
+
+        entradas.add(new Entrada(avE1, 0.30));
+        entradas.add(new Entrada(avW1, 0.30));
+        entradas.add(new Entrada(c1S1, 0.15));
+        entradas.add(new Entrada(c1N1, 0.15));
+        entradas.add(new Entrada(c2S1, 0.15));
+        entradas.add(new Entrada(c2N1, 0.15));
 
         gestorVehiculos = new GestorVehiculos();
         gestorVehiculos.setCruces(cruces);
         gestorVehiculos.setBaches(baches);
     }
 
-
+    /** Vía de 2 carriles (mismo sentido): el offset de cada uno se fija aparte según la orientación. */
     private Via crearVia(double x1, double y1, double x2, double y2) {
         List<Point2D> trazado = Arrays.asList(new Point2D.Double(x1, y1), new Point2D.Double(x2, y2));
-        return new Via(trazado, 1, false, 50);
+        return new Via(trazado, 2, false, 50);
     }
 
-    private Cruce crearCruce(double cx, double cy, Via... accesos) {
-        ZonaCruce zona = new ZonaCruce(cx - 26, cy - 26, 52, 52);
+    /**
+     * Vía horizontal (tramos de la avenida). El carril 0 queda como "rápido" (pegado al eje
+     * central de la calle) y el carril 1 como "lento" (pegado a la vereda), para que el
+     * cambio de carril por congestión (ya existente en GestorVehiculos) sirva para adelantar.
+     */
+    private Via crearViaHorizontal(double x1, double y1, double x2, double y2) {
+        Via via = crearVia(x1, y1, x2, y2);
+        via.getCarriles().get(0).setOffsetY(-OFFSET_RAPIDO);
+        via.getCarriles().get(1).setOffsetY(-OFFSET_LENTO);
+        return via;
+    }
+
+    /** Vía vertical (tramos de las calles), mismo criterio rápido/lento que la horizontal. */
+    private Via crearViaVertical(double x1, double y1, double x2, double y2) {
+        Via via = crearVia(x1, y1, x2, y2);
+        via.getCarriles().get(0).setOffsetY(OFFSET_RAPIDO);
+        via.getCarriles().get(1).setOffsetY(OFFSET_LENTO);
+        return via;
+    }
+
+    private Cruce crearCruce(double cx, double cy, double mitadCebra, Via... accesos) {
+        ZonaCruce zona = new ZonaCruce(cx - mitadCebra, cy - mitadCebra, mitadCebra * 2, mitadCebra * 2);
         Cruce cruce = new Cruce(zona);
         for (Via via : accesos) {
             cruce.agregarAcceso(via, new Semaforo(5, 20, 2));
@@ -144,7 +222,6 @@ public class VentanaPrincipal extends JFrame {
 
         panelSimulacion = new PanelSimulacion();
         panelSimulacion.setDatos(vias, cruces, puentesDemo, baches);
-        panelSimulacion.setGestorVehiculos(gestorVehiculos); // Para que pueda dibujar estadísticas
         add(new JScrollPane(panelSimulacion), BorderLayout.CENTER);
 
         add(construirPanelControles(), BorderLayout.SOUTH);
@@ -245,17 +322,15 @@ public class VentanaPrincipal extends JFrame {
         }
     }
 
-// ---------- loop de simulación ----------
+    // ---------- loop de simulación ----------
 
     private void iniciarLoopSimulacion() {
         timer = new Timer(TICK_MS, e -> {
             if (enPausa) return;
             double deltaTime = (TICK_MS / 1000.0) * multiplicadorVelocidad;
-            panelSimulacion.getEstadisticas().agregarTiempo(deltaTime);
 
             for (Entrada entrada : entradas) {
-                // AQUÍ ESTÁ LA CORRECCIÓN: Usar getVia() y getLambda()
-                gestorVehiculos.intentarSpawn(entrada.getVia(), entrada.getLambda(), deltaTime);
+                gestorVehiculos.intentarSpawn(entrada.via, entrada.lambda, deltaTime);
             }
             gestorVehiculos.actualizar(deltaTime);
             gestorCruces.actualizar(deltaTime);

@@ -1,6 +1,16 @@
 package vista;
 
-import gestor.GestorVehiculos;
+import modelo.Bache;
+import modelo.Bus;
+import modelo.Carril;
+import modelo.Cruce;
+import modelo.Moto;
+import modelo.Puente;
+import modelo.Semaforo;
+import modelo.Vehiculo;
+import modelo.Via;
+
+import javax.swing.JPanel;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics;
@@ -16,16 +26,6 @@ import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import javax.swing.JPanel;
-import modelo.Bache;
-import modelo.Bus;
-import modelo.Carril;
-import modelo.Cruce;
-import modelo.Moto;
-import modelo.Puente;
-import modelo.Semaforo;
-import modelo.Vehiculo;
-import modelo.Via;
 
 /**
  * Dibuja el estado de la simulación con Graphics2D: vías, cruces con
@@ -39,9 +39,6 @@ import modelo.Via;
  * constantes OTRO_LADO_* son puramente decorativas y no dependen de eso.
  */
 public class PanelSimulacion extends JPanel {
-    // ---------- estadísticas ----------
-    private VentanaEstadisticas estadisticas = new VentanaEstadisticas();
-    private GestorVehiculos gestorVehiculos;
 
     // ---------- LAYOUT: debe coincidir con VentanaPrincipal ----------
     private static final int MAPA_ANCHO = 1180;
@@ -53,6 +50,7 @@ public class PanelSimulacion extends JPanel {
     private static final int PUENTE_X2 = 1400;
     private static final int RIO_Y1 = 40;
     private static final int RIO_Y2 = 760;
+    private static final int MITAD_CALZADA = 42; // debe coincidir con "mitadCebra" en VentanaPrincipal
 
     // zona decorativa al otro lado del río: para que el puente lleve a algo,
     // no depende del mapa real de vías (VentanaPrincipal), es puramente visual.
@@ -86,15 +84,6 @@ public class PanelSimulacion extends JPanel {
     private final List<Color> coloresEdificios = new ArrayList<>();
     private final List<Point2D> arboles = new ArrayList<>();
     private final List<Point2D> arbolesOtroLado = new ArrayList<>();
-
-// ---------- constructor y setters estadistica----------
-    public void setGestorVehiculos(GestorVehiculos gestor) {
-        this.gestorVehiculos = gestor;
-    }
-
-    public VentanaEstadisticas getEstadisticas() {
-        return estadisticas;
-    }
 
     public PanelSimulacion() {
         setBackground(COLOR_FONDO);
@@ -167,16 +156,14 @@ public class PanelSimulacion extends JPanel {
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        //DECORACION ESTATICA
         dibujarRioDecorativo(g2);
         dibujarEdificiosYParque(g2);
-        dibujarOtroLadoCalle(g2);
-
         dibujarCalzadas(g2);
-
+        dibujarOtroLadoCalle(g2);
 
         for (Via via : vias) {
             dibujarLineaCentral(g2, via);
+            dibujarDivisorCarriles(g2, via);
         }
         for (Bache b : baches) {
             dibujarBache(g2, b);
@@ -189,8 +176,6 @@ public class PanelSimulacion extends JPanel {
         }
 
         dibujarPuenteDemo(g2);
-        // Dibujar HUD de estadísticas encima de todo
-        estadisticas.dibujar(g2, gestorVehiculos);
     }
 
     // ---------- ciudad (fondo decorativo) ----------
@@ -261,39 +246,22 @@ public class PanelSimulacion extends JPanel {
         double xInicio = PUENTE_X2 - 30; // mismo punto donde termina el tablero del puente
         double xFin = OTRO_LADO_X2 - 50;
 
-        dibujarBandaVial(g2, xInicio, Y_AVENIDA - 26, xFin - xInicio, 52);
+        dibujarBandaVial(g2, xInicio, Y_AVENIDA - MITAD_CALZADA, xFin - xInicio, MITAD_CALZADA * 2);
 
         g2.setColor(COLOR_VEREDA);
-        g2.fill(new Ellipse2D.Double(xFin - 32, Y_AVENIDA - 32, 64, 64));
+        g2.fill(new Ellipse2D.Double(xFin - MITAD_CALZADA - 6, Y_AVENIDA - MITAD_CALZADA - 6, MITAD_CALZADA * 2 + 12, MITAD_CALZADA * 2 + 12));
         g2.setColor(COLOR_ASFALTO);
-        g2.fill(new Ellipse2D.Double(xFin - 26, Y_AVENIDA - 26, 52, 52));
+        g2.fill(new Ellipse2D.Double(xFin - MITAD_CALZADA, Y_AVENIDA - MITAD_CALZADA, MITAD_CALZADA * 2, MITAD_CALZADA * 2));
     }
 
-    // ---------- calzadas dinamic ----------
+    // ---------- calzadas ----------
 
     private void dibujarCalzadas(Graphics2D g2) {
-        for (Via via : vias) {
-            List<Point2D> trazado = via.getTrazado();
-            if (trazado.size() < 2) continue;
-
-            Point2D inicio = trazado.get(0);
-            Point2D fin = trazado.get(trazado.size() - 1);
-
-            // Calculamos el grosor visual basado en la cantidad de carriles
-            float grosorAsfalto = via.getCarriles().size() * 52f; 
-            float grosorVereda = grosorAsfalto + 12f;
-
-            // 1. Dibujar la vereda (línea gruesa de fondo)
-            g2.setColor(COLOR_VEREDA);
-            g2.setStroke(new BasicStroke(grosorVereda, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND));
-            g2.draw(new Line2D.Double(inicio, fin));
-
-            // 2. Dibujar el asfalto (línea central superpuesta)
-            g2.setColor(COLOR_ASFALTO);
-            g2.setStroke(new BasicStroke(grosorAsfalto, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND));
-            g2.draw(new Line2D.Double(inicio, fin));
-        }
+        dibujarBandaVial(g2, 40, Y_AVENIDA - MITAD_CALZADA, MAPA_ANCHO - 40, MITAD_CALZADA * 2);
+        dibujarBandaVial(g2, X_CRUCE_1 - MITAD_CALZADA, 40, MITAD_CALZADA * 2, MAPA_ALTO - 40);
+        dibujarBandaVial(g2, X_CRUCE_2 - MITAD_CALZADA, 40, MITAD_CALZADA * 2, MAPA_ALTO - 40);
     }
+
     private void dibujarBandaVial(Graphics2D g2, double x, double y, double ancho, double alto) {
         int veredaGrosor = 6;
         g2.setColor(COLOR_VEREDA);
@@ -308,6 +276,27 @@ public class PanelSimulacion extends JPanel {
         g2.setColor(COLOR_LINEA);
         g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 1f, new float[]{9f, 7f}, 0f));
         g2.draw(new Line2D.Double(trazado.get(0), trazado.get(trazado.size() - 1)));
+    }
+
+    /** Línea punteada fina entre el carril rápido y el carril lento de una misma vía (mismo sentido). */
+    private void dibujarDivisorCarriles(Graphics2D g2, Via via) {
+        List<Carril> carriles = via.getCarriles();
+        List<Point2D> trazado = via.getTrazado();
+        if (carriles.size() < 2 || trazado.size() < 2) return;
+
+        double offsetMedio = (carriles.get(0).getY() + carriles.get(1).getY()) / 2.0;
+        double[] perp = carriles.get(0).getPerpendicular();
+
+        Point2D a = desplazar(trazado.get(0), perp, offsetMedio);
+        Point2D b = desplazar(trazado.get(trazado.size() - 1), perp, offsetMedio);
+
+        g2.setColor(new Color(255, 255, 255, 150));
+        g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 1f, new float[]{6f, 6f}, 0f));
+        g2.draw(new Line2D.Double(a, b));
+    }
+
+    private Point2D desplazar(Point2D p, double[] perp, double offset) {
+        return new Point2D.Double(p.getX() + perp[0] * offset, p.getY() + perp[1] * offset);
     }
 
     // ---------- cruces (semáforos + cebra) ----------
