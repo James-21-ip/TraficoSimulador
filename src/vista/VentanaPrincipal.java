@@ -170,13 +170,12 @@ c2N1.agregarConexion(avW2);
                 new Bache(X_CRUCE_1 - OFFSET_RAPIDO, 220, 0.4)));
 
         // lambdas bajadas (antes 0.30 / 0.15) para aliviar el amontonamiento en los cruces
-        entradas.add(new Entrada(avE1, 0.20));
-        entradas.add(new Entrada(avW1, 0.20));
-        entradas.add(new Entrada(c1S1, 0.10));
-        entradas.add(new Entrada(c1N1, 0.10));
-        entradas.add(new Entrada(c2S1, 0.10));
-        entradas.add(new Entrada(c2N1, 0.10));
-
+        entradas.add(new Entrada(avE1, 0.12));  // antes 0.20
+entradas.add(new Entrada(avW1, 0.12));  // antes 0.20
+entradas.add(new Entrada(c1S1, 0.06));  // antes 0.10
+entradas.add(new Entrada(c1N1, 0.06));  // antes 0.10
+entradas.add(new Entrada(c2S1, 0.06));  // antes 0.10
+entradas.add(new Entrada(c2N1, 0.06));  // antes 0.10
         gestorVehiculos = new GestorVehiculos();
         gestorVehiculos.setCruces(cruces);
         gestorVehiculos.setBaches(baches);
