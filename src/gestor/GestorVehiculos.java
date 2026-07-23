@@ -17,7 +17,7 @@ public class GestorVehiculos {
     private static final double DISTANCIA_DETECCION_BACHE = 60;
     private static final double DISTANCIA_LINEA_PARADA = 15;
     private static final double MARGEN_SALIDA = 100;
-    private static final double UMBRAL_DECISION_GIRO = 25; // que tan cerca del final de la via se decide el giro
+    private static final double UMBRAL_DECISION_GIRO = 0; // que tan cerca del final de la via se decide el giro
     private static final double PROBABILIDAD_GIRAR = 0.5;  // si hay conexiones, mitad de las veces gira, mitad sigue derecho (y sale del mapa)
 
     public GestorVehiculos() {
@@ -90,25 +90,29 @@ public class GestorVehiculos {
     // ---------- giros en intersecciones (nuevo) ----------
 
     private void aplicarGirosEnIntersecciones() {
-        for (Vehiculo v : vehiculos) {
-            Via via = v.getCarril().getVia();
-            List<Via> conexiones = via.getConexiones();
-            if (conexiones.isEmpty() || v.isDecisionGiroTomada()) continue;
+    for (Vehiculo v : vehiculos) {
+        Via via = v.getCarril().getVia();
+        List<Via> conexiones = via.getConexiones();
+        if (conexiones.isEmpty() || v.isDecisionGiroTomada()) continue;
 
-            double avance = avanceEnVia(v, via);
-            double largoVia = largoDeVia(via);
+        // si esta via tiene semaforo propio y esta en rojo, no lo dejes pasar todavia
+        Cruce.Acceso acceso = buscarAcceso(via);
+        if (acceso != null && !acceso.getSemaforo().estaEnVerde()) continue;
 
-           if (avance >= largoVia - UMBRAL_DECISION_GIRO) {
-    v.marcarDecisionGiroTomada();
+        double avance = avanceEnVia(v, via);
+        double largoVia = largoDeVia(via);
 
-   Via destino = conexiones.get(random.nextInt(conexiones.size()));
-Carril entrada = elegirCarrilEntrada(via, v.getCarril(), destino);
-    if (entrada != null) {
-        v.girarHaciaVia(entrada);
-    }
-}
+        if (avance >= largoVia - UMBRAL_DECISION_GIRO) {
+            v.marcarDecisionGiroTomada();
+
+            Via destino = conexiones.get(random.nextInt(conexiones.size()));
+            Carril entrada = elegirCarrilEntrada(via, v.getCarril(), destino);
+            if (entrada != null) {
+                v.girarHaciaVia(entrada);
+            }
         }
     }
+}
 
     private Carril elegirCarrilEntrada(Via origen, Carril carrilOrigen, Via destino) {
     List<Carril> candidatos = new ArrayList<>();

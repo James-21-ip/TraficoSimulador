@@ -1,4 +1,4 @@
-    package modelo;
+package modelo;
 
     public abstract class Vehiculo {
 
@@ -27,6 +27,17 @@
         private static final double VELOCIDAD_CAMBIO_LATERAL = 40;
         private static final double INCLINACION_MAX = 15;
 
+        // --- cruce animado de intersecciones (girarHaciaVia ya no telepea) ---
+        private boolean cruzandoInterseccion = false;
+        private double[] origenInterseccion;
+        private double[] destinoInterseccion;
+        private double tiempoInterseccion;
+        private double duracionInterseccion;
+        private static final double VELOCIDAD_MINIMA_CRUCE = 25; // que el giro se vea fluido aunque el auto venga casi detenido
+
+        // margen de seguridad: nunca pisar la linea de parada / cebra si hay que frenar
+      
+
         public Vehiculo(double x, double y, Carril carril) {
             this.x = x;
             this.y = y;
@@ -39,52 +50,119 @@
         protected abstract void definirCaracteristicas();
 
         public void mover(Vehiculo vehiculoAdelante, double deltaTime) {
-            mover(vehiculoAdelante, null, deltaTime);
+    mover(vehiculoAdelante, null, deltaTime);
+}
+
+public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada, double deltaTime) {
+    tiempoDesdeUltimoCambio += deltaTime;
+
+    if (cruzandoInterseccion) {
+        avanzarCruceInterseccion(deltaTime);
+        return;
+    }
+
+    actualizarAnguloBase(); // aunque este averiado, sigue "mirando" hacia donde iba
+    if (estaAveriado) {
+        tiempoAveriaRestante -= deltaTime;
+        if (tiempoAveriaRestante <= 0) {
+            estaAveriado = false;
+        }
+        return;
+    }
+
+    if (cambiandoCarril) {
+        avanzarCambioCarril(deltaTime);
+    }
+
+    double margenMinimo = 10;
+
+    double distanciaSeguraVehiculo = velocidad * 1.5 + margenMinimo;
+    if (vehiculoAdelante != null) {
+        distanciaSeguraVehiculo += largo / 2 + vehiculoAdelante.largo / 2;
+    }
+    double distanciaLibreVehiculo = (vehiculoAdelante != null)
+            ? distanciaHacia(vehiculoAdelante)
+            : Double.MAX_VALUE;
+
+    // --- frenado ante semaforos / paradas obligatorias ---
+    // Idea: mientras mas rapido va el vehiculo, mas lejos de la linea empieza a frenar
+    // (colchon de seguridad proporcional a la velocidad) y, si aun asi se quedo corto,
+    // frena con mayor intensidad cuanto mas cerca esta de la linea de parada.
+    double desaceleracionConfort = aceleracion * 2;   // frenado normal, suave
+    double desaceleracionMaxima = aceleracion * 5;    // frenado fuerte, solo si el margen ya se acorto mucho
+    double colchonPorVelocidad = velocidad * 0.4;     // a mas velocidad, empieza a frenar antes
+
+    double distanciaFrenadoFisica = (desaceleracionConfort > 0)
+            ? (velocidad * velocidad) / (2 * desaceleracionConfort)
+            : 0;
+    double distanciaSeguraParada = distanciaFrenadoFisica + margenMinimo + colchonPorVelocidad + largo / 2;
+
+    double distanciaLibreParada = (distanciaHastaParada != null)
+            ? distanciaHastaParada
+            : Double.MAX_VALUE;
+
+    boolean debeFrenarPorVehiculo = distanciaLibreVehiculo < distanciaSeguraVehiculo;
+    boolean debeFrenarPorParada = distanciaLibreParada < distanciaSeguraParada;
+    boolean debeFrenar = debeFrenarPorVehiculo || debeFrenarPorParada;
+
+    double desaceleracionAplicada = desaceleracionConfort;
+    if (debeFrenarPorParada) {
+        // desaceleracion minima necesaria para detenerse justo en la linea con lo que queda
+        double distanciaDisponible = Math.max(distanciaLibreParada - margenMinimo - largo / 2, 0.5);
+        double desaceleracionRequerida = (velocidad * velocidad) / (2 * distanciaDisponible);
+        // nunca menos que el frenado de confort, ni mas que el frenado maximo permitido
+        desaceleracionAplicada = Math.max(desaceleracionConfort,
+                Math.min(desaceleracionRequerida, desaceleracionMaxima));
+    }
+
+    if (debeFrenar) {
+        velocidad = Math.max(0, velocidad - desaceleracionAplicada * deltaTime);
+    } else if (velocidad < velocidadMaxima) {
+        velocidad = Math.min(velocidadMaxima, velocidad + aceleracion * deltaTime);
+    }
+
+    double[] direccion = carril.getDireccion();
+    double avanceTick = velocidad * deltaTime;
+
+    // Salvaguarda dura e independiente del calculo de frenado de arriba: si hay una
+    // parada obligatoria (semaforo en rojo/amarillo o puente ocupado), el vehiculo
+    // jamas debe quedar con el FRENTE a menos de "margenMinimo" unidades de esa
+    // linea en este tick, sin importar que tan grande sea el deltaTime (ej.
+    // simulacion a velocidad x5) o que tan justo haya calculado el frenado.
+    // Por eso se resta tambien largo/2: distanciaHastaParada esta medida desde el
+    // CENTRO del vehiculo, pero lo que no debe cruzar la linea es su frente.
+    if (distanciaHastaParada != null) {
+        double limite = Math.max(0, distanciaHastaParada - margenMinimo - largo / 2);
+        if (avanceTick > limite) {
+            avanceTick = limite;
+            velocidad = 0;
+        }
+    }
+
+    x += direccion[0] * avanceTick;
+    y += direccion[1] * avanceTick;
+}
+
+        /** Avanza la animacion de cruce de interseccion (ver girarHaciaVia): interpola en linea recta
+         * desde donde el vehiculo entro al cruce hasta el punto de inicio de su nuevo carril. */
+        private void avanzarCruceInterseccion(double deltaTime) {
+            tiempoInterseccion += deltaTime;
+            double t = (duracionInterseccion > 0) ? Math.min(1.0, tiempoInterseccion / duracionInterseccion) : 1.0;
+
+            double dx = destinoInterseccion[0] - origenInterseccion[0];
+            double dy = destinoInterseccion[1] - origenInterseccion[1];
+            x = origenInterseccion[0] + dx * t;
+            y = origenInterseccion[1] + dy * t;
+            if (dx != 0 || dy != 0) {
+                anguloBase = Math.toDegrees(Math.atan2(dy, dx));
+            }
+
+            if (t >= 1.0) {
+                cruzandoInterseccion = false;
+            }
         }
 
-        public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada, double deltaTime) {
-            actualizarAnguloBase(); // aunque este averiado, sigue "mirando" hacia donde iba
-            tiempoDesdeUltimoCambio += deltaTime;
-            if (estaAveriado) {
-                tiempoAveriaRestante -= deltaTime;
-                if (tiempoAveriaRestante <= 0) {
-                    estaAveriado = false;
-                }
-                return;
-            }
-
-            if (cambiandoCarril) {
-                avanzarCambioCarril(deltaTime);
-            }
-
-            double margenMinimo = 10;
-
-            double distanciaSeguraVehiculo = velocidad * 1.5 + margenMinimo;
-            if (vehiculoAdelante != null) {
-                distanciaSeguraVehiculo += largo / 2 + vehiculoAdelante.largo / 2;
-            }
-            double distanciaLibreVehiculo = (vehiculoAdelante != null)
-                    ? distanciaHacia(vehiculoAdelante)
-                    : Double.MAX_VALUE;
-
-            double distanciaSeguraParada = velocidad * 1.5 + margenMinimo + largo / 2;
-            double distanciaLibreParada = (distanciaHastaParada != null)
-                    ? distanciaHastaParada
-                    : Double.MAX_VALUE;
-
-            boolean debeFrenar = distanciaLibreVehiculo < distanciaSeguraVehiculo
-                    || distanciaLibreParada < distanciaSeguraParada;
-
-            if (debeFrenar) {
-                velocidad = Math.max(0, velocidad - aceleracion * 2 * deltaTime);
-            } else if (velocidad < velocidadMaxima) {
-                velocidad = Math.min(velocidadMaxima, velocidad + aceleracion * deltaTime);
-            }
-
-            double[] direccion = carril.getDireccion();
-            x += direccion[0] * velocidad * deltaTime;
-            y += direccion[1] * velocidad * deltaTime;
-        }
+        public boolean isCruzandoInterseccion() { return cruzandoInterseccion; }
 
         private void actualizarAnguloBase() {
             double[] dir = carril.getDireccion();
