@@ -140,7 +140,24 @@ public class VentanaPrincipal extends JFrame {
 
         Cruce cruce1 = crearCruce(X_CRUCE_1, Y_AVENIDA, mitadCebra, avE1, avW2, c1S1, c1N1);
         Cruce cruce2 = crearCruce(X_CRUCE_2, Y_AVENIDA, mitadCebra, avE2, avW1, c2S1, c2N1);
+avE1.agregarConexion(c1S2);
+avE1.agregarConexion(c1N2);
+avW2.agregarConexion(c1N2);
+avW2.agregarConexion(c1S2);
+c1S1.agregarConexion(avW3);
+c1S1.agregarConexion(avE2);
+c1N1.agregarConexion(avE2);
+c1N1.agregarConexion(avW3);
 
+avE2.agregarConexion(c2S2);
+avE2.agregarConexion(c2N2);
+avW1.agregarConexion(c2N2);
+avW1.agregarConexion(c2S2);
+c2S1.agregarConexion(avW2);
+c2S1.agregarConexion(avE3);
+c2N1.agregarConexion(avE3);
+c2N1.agregarConexion(avW2);
+        
         vias = new ArrayList<>(Arrays.asList(
                 avE1, avE2, avE3, avW1, avW2, avW3,
                 c1S1, c1S2, c1N1, c1N2, c2S1, c2S2, c2N1, c2N2));

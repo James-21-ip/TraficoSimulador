@@ -18,7 +18,7 @@ public class GestorVehiculos {
     private static final double DISTANCIA_LINEA_PARADA = 15;
     private static final double MARGEN_SALIDA = 100;
     private static final double UMBRAL_DECISION_GIRO = 0; // que tan cerca del final de la via se decide el giro
-    private static final double PROBABILIDAD_GIRAR = 0.5;  // si hay conexiones, mitad de las veces gira, mitad sigue derecho (y sale del mapa)
+    private static final double PROBABILIDAD_GIRAR = 0.2;  // si hay conexiones, mitad de las veces gira, mitad sigue derecho (y sale del mapa)
 
     public GestorVehiculos() {
         vehiculos = new ArrayList<>();
@@ -109,13 +109,41 @@ public class GestorVehiculos {
         if (avance >= largoVia - UMBRAL_DECISION_GIRO) {
             v.marcarDecisionGiroTomada();
 
-            Via destino = conexiones.get(random.nextInt(conexiones.size()));
+          Via destino = elegirViaDestino(via, v.getCarril(), conexiones);
             Carril entrada = elegirCarrilEntrada(via, v.getCarril(), destino);
             if (entrada != null) {
                 v.girarHaciaVia(entrada);
             }
         }
     }
+}
+    private Via elegirViaDestino(Via via, Carril carrilOrigen, List<Via> conexiones) {
+    double[] dirActual = carrilOrigen.getDireccion();
+
+    List<Via> rectas = new ArrayList<>();
+    List<Via> giros = new ArrayList<>();
+    for (Via candidata : conexiones) {
+        double[] dirCandidata = direccionEntrada(candidata);
+        double alineacion = dirActual[0] * dirCandidata[0] + dirActual[1] * dirCandidata[1];
+        if (alineacion > 0.85) {
+            rectas.add(candidata);
+        } else {
+            giros.add(candidata);
+        }
+    }
+
+    if (!rectas.isEmpty() && !giros.isEmpty()) {
+        List<Via> grupoElegido = (random.nextDouble() < PROBABILIDAD_GIRAR) ? giros : rectas;
+        return grupoElegido.get(random.nextInt(grupoElegido.size()));
+    }
+    return conexiones.get(random.nextInt(conexiones.size()));
+}
+
+private double[] direccionEntrada(Via via) {
+    for (Carril c : via.getCarriles()) {
+        if (c.isSentidoIda()) return c.getDireccion();
+    }
+    return via.getCarriles().get(0).getDireccion();
 }
 
     private Carril elegirCarrilEntrada(Via origen, Carril carrilOrigen, Via destino) {
