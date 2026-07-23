@@ -97,7 +97,7 @@ public class GestorVehiculos {
 
         // si esta via tiene semaforo propio y esta en rojo, no lo dejes pasar todavia
         Cruce.Acceso acceso = buscarAcceso(via);
-        if (acceso != null && !acceso.getSemaforo().estaEnVerde()) continue;
+        if (acceso != null && !acceso.getSemaforo().estaEnVerde() && !v.estaComprometidoACruzar()) continue;
 
         double avance = avanceEnVia(v, via);
         double largoVia = largoDeVia(via);
@@ -183,23 +183,59 @@ public class GestorVehiculos {
 
     // ---------- semaforos y puentes ----------
 
-    private Double calcularDistanciaParada(Vehiculo v) {
-        Via via = v.getCarril().getVia();
+ private Double calcularDistanciaParada(Vehiculo v) {
+    Via via = v.getCarril().getVia();
 
-        Cruce.Acceso acceso = buscarAcceso(via);
-        if (acceso != null && !acceso.getSemaforo().estaEnVerde()) {
-            return distanciaHastaFinDeVia(v, via);
+    Cruce.Acceso acceso = buscarAcceso(via);
+    if (acceso != null) {
+        if (v.estaComprometidoACruzar()) {
+            return null;
         }
 
-        for (Puente puente : puentes) {
-            if (puente.getVia() == via && !puente.estaLibre()) {
-                return distanciaHastaFinDeVia(v, via);
+        double distanciaLinea = avanceRestanteHastaFinDeVia(v, via);
+
+        // si el vehiculo YA paso la linea (ej. entro con verde y el semaforo
+        // cambio justo despues), no tiene sentido congelarlo ahi: ya esta
+        // fisicamente del otro lado, asi que se compromete a terminar de
+        // cruzar en vez de forzarlo a parar sobre una linea que ya dejo atras.
+        if (distanciaLinea <= 0) {
+            v.comprometerACruzar();
+            return null;
+        }
+
+        Semaforo semaforo = acceso.getSemaforo();
+
+        if (semaforo.estaEnRojo()) {
+            return distanciaLinea;
+        }
+
+        if (semaforo.estaEnAmarillo()) {
+            if (v.puedeFrenarComodamenteAntesDe(distanciaLinea)) {
+                return distanciaLinea;
             }
+            v.comprometerACruzar();
+            return null;
         }
-
-        return null;
+        // VERDE: sigue de largo, no hay parada
     }
 
+    for (Puente puente : puentes) {
+        if (puente.getVia() == via && !puente.estaLibre()) {
+            return distanciaHastaFinDeVia(v, via);
+        }
+    }
+
+    return null;
+}
+/** Distancia con signo hacia adelante que le falta a "v" para llegar al
+ * final de su via. Si ya la paso, da negativo o cero. A diferencia de
+ * distanciaHastaFinDeVia (distancia euclidiana sin signo), esta si
+ * distingue "todavia no llego" de "ya paso", evitando que un vehiculo
+ * que ya cruzo la linea se quede congelado ahi. */
+private double avanceRestanteHastaFinDeVia(Vehiculo v, Via via) {
+    return largoDeVia(via) - avanceEnVia(v, via);
+}
+ 
     private Cruce.Acceso buscarAcceso(Via via) {
         for (Cruce cruce : cruces) {
             for (Cruce.Acceso acceso : cruce.getAccesos()) {

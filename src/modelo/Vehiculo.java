@@ -36,6 +36,18 @@ package modelo;
         private static final double VELOCIDAD_MINIMA_CRUCE = 25; // que el giro se vea fluido aunque el auto venga casi detenido
 
         // margen de seguridad: nunca pisar la linea de parada / cebra si hay que frenar
+        // --- "zona de dilema" ante semaforos en amarillo ---
+// Si el vehiculo ya no alcanza a frenar comodo cuando el semaforo se pone
+// amarillo, se compromete a cruzar (en vez de frenar en seco justo en la
+// linea). Se mantiene en true hasta que efectivamente cruza la interseccion,
+// asi que aunque el semaforo cambie a rojo un instante despues, no se detiene
+// a mitad de camino.
+private boolean comprometidoACruzar = false;
+        
+        
+        
+        
+        
       
 
         public Vehiculo(double x, double y, Carril carril) {
@@ -169,6 +181,38 @@ public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada, double
             anguloBase = Math.toDegrees(Math.atan2(dir[1], dir[0]));
         }
 
+        
+        
+        /** true si, yendo a la velocidad actual, el vehiculo todavia alcanza a
+ * detenerse con una desaceleracion comoda (no brusca) antes de recorrer
+ * "distanciaHastaLinea". Usa la misma formula que el frenado normal en
+ * mover(), para que la decision de "puedo parar" y el frenado real
+ * coincidan siempre. */
+public boolean puedeFrenarComodamenteAntesDe(double distanciaHastaLinea) {
+    double margenMinimo = 10;
+    double desaceleracionConfort = aceleracion * 2;
+    double colchonPorVelocidad = velocidad * 0.4;
+    double distanciaFrenadoFisica = (desaceleracionConfort > 0)
+            ? (velocidad * velocidad) / (2 * desaceleracionConfort)
+            : 0;
+    double distanciaSeguraParada = distanciaFrenadoFisica + margenMinimo + colchonPorVelocidad + largo / 2;
+    return distanciaHastaLinea >= distanciaSeguraParada;
+}
+
+/** El vehiculo decide seguir de largo pese a no estar en verde (amarillo
+ * en zona de dilema). A partir de aca deja de tratarse como una parada
+ * obligatoria hasta que efectivamente cruce la interseccion. */
+public void comprometerACruzar() {
+    comprometidoACruzar = true;
+}
+
+public boolean estaComprometidoACruzar() {
+    return comprometidoACruzar;
+}
+        
+        
+        
+        
         protected double distanciaHacia(Vehiculo otro) {
             return Math.hypot(otro.x - this.x, otro.y - this.y);
         }
@@ -283,6 +327,7 @@ public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada, double
     inclinacion = 0;
     cambiandoCarril = false;
     decisionGiroTomada = false;
+    comprometidoACruzar = false; // ya cruzo: el proximo semaforo se evalua de cero
 }
 
         public boolean isDecisionGiroTomada() { return decisionGiroTomada; }
