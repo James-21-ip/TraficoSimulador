@@ -144,6 +144,7 @@ public class VentanaPrincipal extends JFrame {
 
         panelSimulacion = new PanelSimulacion();
         panelSimulacion.setDatos(vias, cruces, puentesDemo, baches);
+        panelSimulacion.setGestorVehiculos(gestorVehiculos); // Para que pueda dibujar estadísticas
         add(new JScrollPane(panelSimulacion), BorderLayout.CENTER);
 
         add(construirPanelControles(), BorderLayout.SOUTH);
@@ -250,6 +251,7 @@ public class VentanaPrincipal extends JFrame {
         timer = new Timer(TICK_MS, e -> {
             if (enPausa) return;
             double deltaTime = (TICK_MS / 1000.0) * multiplicadorVelocidad;
+            panelSimulacion.getEstadisticas().agregarTiempo(deltaTime);
 
             for (Entrada entrada : entradas) {
                 // AQUÍ ESTÁ LA CORRECCIÓN: Usar getVia() y getLambda()

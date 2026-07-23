@@ -1,5 +1,6 @@
 package vista;
 
+import gestor.GestorVehiculos;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics;
@@ -38,6 +39,9 @@ import modelo.Via;
  * constantes OTRO_LADO_* son puramente decorativas y no dependen de eso.
  */
 public class PanelSimulacion extends JPanel {
+    // ---------- estadísticas ----------
+    private VentanaEstadisticas estadisticas = new VentanaEstadisticas();
+    private GestorVehiculos gestorVehiculos;
 
     // ---------- LAYOUT: debe coincidir con VentanaPrincipal ----------
     private static final int MAPA_ANCHO = 1180;
@@ -82,6 +86,15 @@ public class PanelSimulacion extends JPanel {
     private final List<Color> coloresEdificios = new ArrayList<>();
     private final List<Point2D> arboles = new ArrayList<>();
     private final List<Point2D> arbolesOtroLado = new ArrayList<>();
+
+// ---------- constructor y setters estadistica----------
+    public void setGestorVehiculos(GestorVehiculos gestor) {
+        this.gestorVehiculos = gestor;
+    }
+
+    public VentanaEstadisticas getEstadisticas() {
+        return estadisticas;
+    }
 
     public PanelSimulacion() {
         setBackground(COLOR_FONDO);
@@ -176,6 +189,8 @@ public class PanelSimulacion extends JPanel {
         }
 
         dibujarPuenteDemo(g2);
+        // Dibujar HUD de estadísticas encima de todo
+        estadisticas.dibujar(g2, gestorVehiculos);
     }
 
     // ---------- ciudad (fondo decorativo) ----------
