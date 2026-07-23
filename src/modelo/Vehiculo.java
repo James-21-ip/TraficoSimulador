@@ -264,20 +264,26 @@ public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada, double
         }
 
         /** Salta a otra vía (giro en una intersección). Instantáneo: aparece en el punto de entrada del carril nuevo, ya orientado hacia su nueva dirección. */
-        public void girarHaciaVia(Carril nuevoCarril) {
-            carril.quitarVehiculo(this);
-            nuevoCarril.agregarVehiculo(this);
-            carril = nuevoCarril;
+       public void girarHaciaVia(Carril nuevoCarril) {
+    double[] destino = nuevoCarril.getPuntoInicio();
+    double distancia = Math.hypot(destino[0] - x, destino[1] - y);
 
-            double[] punto = nuevoCarril.getPuntoInicio();
-            x = punto[0];
-            y = punto[1];
+    origenInterseccion = new double[]{x, y};
+    destinoInterseccion = destino;
 
-            actualizarAnguloBase();
-            inclinacion = 0;
-            cambiandoCarril = false;
-            decisionGiroTomada = false; // en la via nueva, todavia no decidio nada
-        }
+    double velocidadCruce = Math.max(velocidad, VELOCIDAD_MINIMA_CRUCE);
+    duracionInterseccion = distancia / velocidadCruce;
+    tiempoInterseccion = 0;
+    cruzandoInterseccion = true;
+
+    carril.quitarVehiculo(this);
+    nuevoCarril.agregarVehiculo(this);
+    carril = nuevoCarril;
+
+    inclinacion = 0;
+    cambiandoCarril = false;
+    decisionGiroTomada = false;
+}
 
         public boolean isDecisionGiroTomada() { return decisionGiroTomada; }
         public void marcarDecisionGiroTomada() { decisionGiroTomada = true; }
