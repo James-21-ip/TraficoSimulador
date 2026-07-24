@@ -1,8 +1,8 @@
 package gestor;
 
-import modelo.*;
 import java.awt.geom.Point2D;
 import java.util.*;
+import modelo.*;
 
 public class GestorVehiculos {
 
@@ -79,7 +79,7 @@ public class GestorVehiculos {
         for (Vehiculo v : vehiculos) {
             Vehiculo adelante = v.getCarril().getVehiculoAdelante(v);
             Double distanciaParada = calcularDistanciaParada(v);
-            v.mover(adelante, distanciaParada, deltaTime);
+            v.mover(adelante, distanciaParada,null, deltaTime);
         }
         aplicarEvasionBaches();
         aplicarCambiosPorCongestion();

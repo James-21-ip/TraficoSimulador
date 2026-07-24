@@ -1,7 +1,24 @@
 package vista;
-
 import gestor.GestorCruces;
+import gestor.GestorPeatones;
 import gestor.GestorVehiculos;
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Queue;
+import java.util.Random;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSlider;
+import javax.swing.Timer;
 import modelo.Auto;
 import modelo.Bache;
 import modelo.Bus;
@@ -13,23 +30,6 @@ import modelo.Semaforo;
 import modelo.Vehiculo;
 import modelo.Via;
 import modelo.ZonaCruce;
-
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JSlider;
-import javax.swing.Timer;
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import java.awt.geom.Point2D;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Queue;
-import java.util.Random;
 
 /**
  * Ventana principal: arma el mapa (avenida + 2 calles + 2 cruces + baches),
@@ -51,6 +51,7 @@ import java.util.Random;
  * Puente + GestorCruces, sin tocar esas clases.
  */
 public class VentanaPrincipal extends JFrame {
+    private GestorPeatones gestorPeatones;
 
     private static final int TICK_MS = 50; // 20 ticks por segundo
 
@@ -179,6 +180,21 @@ entradas.add(new Entrada(c2N1, 0.06));  // antes 0.10
         gestorVehiculos = new GestorVehiculos();
         gestorVehiculos.setCruces(cruces);
         gestorVehiculos.setBaches(baches);
+        // Creación de delimitadores (Bounding boxes) para veredas norte y sur de la avenida principal
+        List<Rectangle2D> veredas = Arrays.asList(
+            new Rectangle2D.Double(40, Y_AVENIDA - 100, MAPA_ANCHO - 80, 50), // Vereda Norte
+            new Rectangle2D.Double(40, Y_AVENIDA + 50, MAPA_ANCHO - 80, 50)   // Vereda Sur
+        );
+
+        // Zonas random para cruzar (fuera de las intersecciones)
+        List<Rectangle2D> pasosRandom = Arrays.asList(
+            new Rectangle2D.Double(200, Y_AVENIDA - 42, 40, 84),
+            new Rectangle2D.Double(550, Y_AVENIDA - 42, 40, 84),
+            new Rectangle2D.Double(950, Y_AVENIDA - 42, 40, 84)
+        );
+
+        // Inicia 15 peatones usando la variable de clase (this)
+        this.gestorPeatones = new GestorPeatones(veredas, pasosRandom, 15);
     }
 
     /** Vía de 2 carriles (mismo sentido): el offset de cada uno se fija aparte según la orientación. */
@@ -239,6 +255,9 @@ entradas.add(new Entrada(c2N1, 0.06));  // antes 0.10
 
         panelSimulacion = new PanelSimulacion();
         panelSimulacion.setDatos(vias, cruces, puentesDemo, baches);
+
+        panelSimulacion.setGestorPeatones(this.gestorPeatones);
+
         add(new JScrollPane(panelSimulacion), BorderLayout.CENTER);
 
         add(construirPanelControles(), BorderLayout.SOUTH);
@@ -326,7 +345,7 @@ entradas.add(new Entrada(c2N1, 0.06));  // antes 0.10
         Vehiculo cruzando = puenteDemo.getVehiculoCruzando();
         if (cruzando == null) return;
 
-        cruzando.mover(null, null, deltaTime); // reusa la fisica normal del vehiculo (acelera y avanza)
+        cruzando.mover(null, null, null, deltaTime); // reusa la fisica normal del vehiculo (acelera y avanza)
 
         List<Point2D> trazado = puenteDemo.getVia().getTrazado();
         Point2D destino = cruzando.getCarril().isSentidoIda()
@@ -342,6 +361,7 @@ entradas.add(new Entrada(c2N1, 0.06));  // antes 0.10
     // ---------- loop de simulación ----------
 
     private void iniciarLoopSimulacion() {
+        
         timer = new Timer(TICK_MS, e -> {
             if (enPausa) return;
             double deltaTime = (TICK_MS / 1000.0) * multiplicadorVelocidad;
@@ -352,6 +372,7 @@ entradas.add(new Entrada(c2N1, 0.06));  // antes 0.10
             gestorVehiculos.actualizar(deltaTime);
             gestorCruces.actualizar(deltaTime);
             actualizarPuenteDemo(deltaTime);
+            gestorPeatones.actualizar(deltaTime, gestorVehiculos.getVehiculos());
             // TODO: cuando GestorPeatones exista, también va acá su actualizar(deltaTime).
 
             panelSimulacion.repaint();

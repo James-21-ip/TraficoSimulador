@@ -1,16 +1,5 @@
 package vista;
-
-import modelo.Bache;
-import modelo.Bus;
-import modelo.Carril;
-import modelo.Cruce;
-import modelo.Moto;
-import modelo.Puente;
-import modelo.Semaforo;
-import modelo.Vehiculo;
-import modelo.Via;
-
-import javax.swing.JPanel;
+import gestor.GestorPeatones;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics;
@@ -26,6 +15,17 @@ import java.awt.geom.RoundRectangle2D;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import javax.swing.JPanel;
+import modelo.Bache;
+import modelo.Bus;
+import modelo.Carril;
+import modelo.Cruce;
+import modelo.Moto;
+import modelo.Peaton;
+import modelo.Puente;
+import modelo.Semaforo;
+import modelo.Vehiculo;
+import modelo.Via;
 
 /**
  * Dibuja el estado de la simulación con Graphics2D: vías, cruces con
@@ -39,6 +39,7 @@ import java.util.Random;
  * constantes OTRO_LADO_* son puramente decorativas y no dependen de eso.
  */
 public class PanelSimulacion extends JPanel {
+    private GestorPeatones gestorPeatones;
 
     // ---------- LAYOUT: debe coincidir con VentanaPrincipal ----------
     private static final int MAPA_ANCHO = 1180;
@@ -169,14 +170,25 @@ public class PanelSimulacion extends JPanel {
             dibujarBache(g2, b);
         }
         for (Cruce cruce : cruces) {
-            dibujarCruce(g2, cruce);
+            //dibujarCruce(g2, cruce);
         }
         for (Via via : vias) {
             dibujarVehiculosDeVia(g2, via);
+            if (gestorPeatones != null) {
+                for (Rectangle2D paso : gestorPeatones.getPasosAleatorios()) {
+                    dibujarCebra(g2, paso);
+    }
+    // Dibujar Peatones
+        for (Peaton p : gestorPeatones.getPeatones()) {
+            g2.setColor(new java.awt.Color(200, 100, 100)); // Color distintivo para peatón
+            g2.fill(new java.awt.geom.Ellipse2D.Double(p.getX() - 4, p.getY() - 4, 8, 8));
+        }
+    }
         }
 
         dibujarPuenteDemo(g2);
     }
+    public void setGestorPeatones(GestorPeatones gp) { this.gestorPeatones = gp; }
 
     // ---------- ciudad (fondo decorativo) ----------
 

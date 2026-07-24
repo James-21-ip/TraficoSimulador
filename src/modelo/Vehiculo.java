@@ -1,5 +1,5 @@
 package modelo;
-
+import java.util.List;
     public abstract class Vehiculo {
 
         protected double x;
@@ -62,10 +62,10 @@ private boolean comprometidoACruzar = false;
         protected abstract void definirCaracteristicas();
 
         public void mover(Vehiculo vehiculoAdelante, double deltaTime) {
-    mover(vehiculoAdelante, null, deltaTime);
+    mover(vehiculoAdelante,null, null, deltaTime);
 }
 
-public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada, double deltaTime) {
+public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada,List<Peaton> peatones, double deltaTime) {
     tiempoDesdeUltimoCambio += deltaTime;
 
     if (cruzandoInterseccion) {
@@ -80,6 +80,32 @@ public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada, double
             estaAveriado = false;
         }
         return;
+    }
+    // Detección frontal de peatones (Frenado Dinámico)
+    double distanciaPeaton = Double.MAX_VALUE;
+    if (peatones != null) {
+        double[] dir = carril.getDireccion();
+        for (Peaton p : peatones) {
+            if (p.getEstadoActual() == Peaton.Estado.CRUZANDO_CALLE) {
+                // Cálculo de distancia vectorial (vector distance)
+                double dx = p.getX() - x;
+                double dy = p.getY() - y;
+                double proyeccionAdelante = dx * dir[0] + dy * dir[1];
+                double desviacionLateral = Math.abs(-dx * dir[1] + dy * dir[0]);
+
+                // Si el peatón está enfrente y en nuestro mismo carril proyectado (ancho)
+                if (proyeccionAdelante > 0 && proyeccionAdelante < 80 && desviacionLateral < ancho) {
+                    if (proyeccionAdelante < distanciaPeaton) {
+                        distanciaPeaton = proyeccionAdelante;
+                    }
+                }
+            }
+        }
+    }
+
+    // Usamos la distancia al peatón si es más urgente que el semáforo
+    if (distanciaPeaton != Double.MAX_VALUE) {
+        distanciaHastaParada = (distanciaHastaParada == null) ? distanciaPeaton : Math.min(distanciaHastaParada, distanciaPeaton);
     }
 
     if (cambiandoCarril) {
