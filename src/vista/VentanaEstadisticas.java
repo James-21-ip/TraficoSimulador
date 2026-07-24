@@ -65,7 +65,9 @@ public class VentanaEstadisticas {
         textoY += 20;
         dibujarFilaColor(g2, "Motos", motos, COLOR_MOTO, x + padding, textoY);
     }
-
+    public double getTiempoSimulacion() {
+        return tiempoSimulacion;
+    }
     private void dibujarFilaColor(Graphics2D g2, String etiqueta, int cantidad, Color color, int x, int y) {
         // Cuadro de color representativo
         g2.setColor(color);

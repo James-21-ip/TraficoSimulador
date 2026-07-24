@@ -279,7 +279,39 @@ public class VentanaPrincipal extends JFrame {
         botonCargar.addActionListener(e -> cargarEstado());
         panel.add(botonCargar);
 
+        // AÑADIMOS EL BOTÓN DE REPORTE AQUÍ
+        JButton botonReporte = new JButton("Generar Reporte");
+        botonReporte.addActionListener(e -> exportarReporte());
+        panel.add(botonReporte);
+
         return panel;
+    }
+    // ---------- LÓGICA DE REPORTE ----------
+    private void exportarReporte() {
+        boolean estadoPausaPrevio = enPausa;
+        enPausa = true; // Congelamos la simulación para que los datos no cambien mientras se escribe
+
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Exportar Reporte (TXT)");
+
+        if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File archivo = fileChooser.getSelectedFile();
+            
+            // Forzar que tenga extensión .txt
+            if (!archivo.getName().toLowerCase().endsWith(".txt")) {
+                archivo = new File(archivo.getParentFile(), archivo.getName() + ".txt");
+            }
+            
+            try {
+                // Llamamos a la clase ArchivoReporte que creamos en el paso 1
+                fichero.ArchivoReporte.generarReporteTxt(archivo, gestorVehiculos, estadisticas.getTiempoSimulacion());
+                JOptionPane.showMessageDialog(this, "Reporte exportado exitosamente.");
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error al generar el reporte: " + ex.getMessage(), "Error de I/O", JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
+            }
+        }
+        enPausa = estadoPausaPrevio;
     }
 
     // ---------- LÓGICA DE PERSISTENCIA (GUARDAR Y CARGAR) ----------
