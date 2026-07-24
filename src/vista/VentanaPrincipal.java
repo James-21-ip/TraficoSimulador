@@ -18,6 +18,9 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
@@ -27,6 +30,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSlider;
+import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import modelo.Auto;
 import modelo.Bache;
@@ -61,6 +65,8 @@ public class VentanaPrincipal extends JFrame {
     private GestorVehiculos gestorVehiculos;
     private GestorCruces gestorCruces;
 
+    private ScheduledExecutorService executor;
+    private final Object simulationLock = new Object();
     private List<Via> vias;
     private List<Cruce> cruces;
     private List<Puente> puentesDemo;
@@ -252,6 +258,12 @@ public class VentanaPrincipal extends JFrame {
 
     private void construirInterfaz() {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                if (executor != null) executor.shutdownNow();
+            }
+        });
         setSize(1300, 900);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
@@ -260,6 +272,7 @@ public class VentanaPrincipal extends JFrame {
         panelSimulacion.setDatos(vias, cruces, puentesDemo, baches);
         panelSimulacion.setGestorPeatones(this.gestorPeatones);
         panelSimulacion.setEstadisticas(estadisticas, gestorVehiculos);
+        panelSimulacion.setSimulationLock(this.simulationLock);
 
         add(new JScrollPane(panelSimulacion), BorderLayout.CENTER);
         add(construirPanelControles(), BorderLayout.SOUTH);
@@ -484,26 +497,27 @@ public class VentanaPrincipal extends JFrame {
     }
 
     private void iniciarLoopSimulacion() {
-        timer = new Timer(TICK_MS, e -> {
-            if (enPausa) return;
-            double deltaTime = (TICK_MS / 1000.0) * multiplicadorVelocidad;
+        Runnable tick = () -> {
+            synchronized (simulationLock) {
+                if (enPausa) return;
+                double deltaTime = (TICK_MS / 1000.0) * multiplicadorVelocidad;
 
-            estadisticas.agregarTiempo(deltaTime);
+                estadisticas.agregarTiempo(deltaTime);
 
-            for (Entrada entrada : entradas) {
-                gestorVehiculos.intentarSpawn(entrada.via, entrada.lambda, deltaTime);
+                for (Entrada entrada : entradas) {
+                    gestorVehiculos.intentarSpawn(entrada.via, entrada.lambda, deltaTime);
+                }
+                gestorVehiculos.actualizar(deltaTime);
+                gestorCruces.actualizar(deltaTime);
+
+                if (gestorPeatones != null) {
+                    gestorPeatones.actualizar(deltaTime, gestorVehiculos.getVehiculos(), cruces);
+                }
             }
-            gestorVehiculos.actualizar(deltaTime);
-            gestorCruces.actualizar(deltaTime);
-            
-            // CAMBIA ESTO EN TU BUCLE DE SIMULACIÓN:
-            if (gestorPeatones != null) {
-                // Ahora le pasamos también la lista global 'cruces'
-                gestorPeatones.actualizar(deltaTime, gestorVehiculos.getVehiculos(), cruces);
-            }
+            SwingUtilities.invokeLater(() -> panelSimulacion.repaint());
+        };
 
-            panelSimulacion.repaint();
-        });
-        timer.start();
+        executor = Executors.newSingleThreadScheduledExecutor();
+        executor.scheduleAtFixedRate(tick, 0, TICK_MS, TimeUnit.MILLISECONDS);
     }
 }

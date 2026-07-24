@@ -83,6 +83,7 @@ public class PanelSimulacion extends JPanel {
     private List<Cruce> cruces = new ArrayList<>();
     private List<Puente> puentes = new ArrayList<>();
     private List<Bache> baches = new ArrayList<>();
+    private Object simulationLock = null;
 
     private final List<Rectangle2D> edificios = new ArrayList<>();
     private final List<Color> coloresEdificios = new ArrayList<>();
@@ -100,6 +101,10 @@ public class PanelSimulacion extends JPanel {
         this.cruces = cruces;
         this.puentes = puentes;
         this.baches = baches;
+    }
+
+    public void setSimulationLock(Object lock) {
+        this.simulationLock = lock;
     }
 
     public void setGestorPeatones(GestorPeatones gp) { this.gestorPeatones = gp; }
@@ -167,13 +172,34 @@ public class PanelSimulacion extends JPanel {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        // Tomar snapshots del estado de la simulación de forma sincronizada
+        List<Via> vias;
+        List<Cruce> cruces;
+        List<Bache> baches;
+        GestorPeatones gestorPeatones;
+        GestorVehiculos gestorVehiculosRef;
+
+        if (simulationLock != null) {
+            synchronized (simulationLock) {
+                vias = new ArrayList<>(this.vias);
+                cruces = new ArrayList<>(this.cruces);
+                baches = new ArrayList<>(this.baches);
+                gestorPeatones = this.gestorPeatones;
+                gestorVehiculosRef = this.gestorVehiculosRef;
+            }
+        } else {
+            vias = this.vias;
+            cruces = this.cruces;
+            baches = this.baches;
+            gestorPeatones = this.gestorPeatones;
+            gestorVehiculosRef = this.gestorVehiculosRef;
+        }
 
         dibujarRioDecorativo(g2);
         dibujarEdificiosYParque(g2);
         dibujarCalzadas(g2);
         dibujarOtroLadoCalle(g2);
         dibujarPuenteDemo(g2); // el tablero es "piso": va antes que autos/cebras/semáforos para que no los tape
-
         for (Via via : vias) {
             dibujarLineaCentral(g2, via);
             dibujarDivisorCarriles(g2, via);
