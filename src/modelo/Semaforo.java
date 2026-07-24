@@ -1,8 +1,10 @@
 package modelo;
 
+import java.io.Serializable;
+
 // Estado actual de un semáforo y su temporizador.
 
-public class Semaforo {
+public class Semaforo implements Serializable {
 
     public enum Estado {
         ROJO,

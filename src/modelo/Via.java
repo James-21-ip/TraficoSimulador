@@ -1,10 +1,11 @@
 package modelo;
 
+import java.awt.geom.Point2D;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
-import java.awt.geom.Point2D;
 
-public class Via {
+public class Via implements Serializable {
 
     private List<Point2D> trazado;
     private List<Carril> carriles;

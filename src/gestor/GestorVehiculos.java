@@ -1,10 +1,11 @@
 package gestor;
 
 import java.awt.geom.Point2D;
+import java.io.Serializable;
 import java.util.*;
 import modelo.*;
 
-public class GestorVehiculos {
+public class GestorVehiculos implements Serializable {
 
     private List<Vehiculo> vehiculos;
     private List<Bache> baches;
@@ -215,7 +216,7 @@ private double[] direccionEntrada(Via via) {
 
     // ---------- semaforos y puentes ----------
 
- private Double calcularDistanciaParada(Vehiculo v) {
+private Double calcularDistanciaParada(Vehiculo v) {
     Via via = v.getCarril().getVia();
 
     Cruce.Acceso acceso = buscarAcceso(via);

@@ -1,6 +1,8 @@
 package modelo;
 
-public class Moto extends Vehiculo {
+import java.io.Serializable;
+
+public class Moto extends Vehiculo implements Serializable {
 
     public Moto(double x, double y, Carril carril) {
         super(x, y, carril);

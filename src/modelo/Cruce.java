@@ -1,10 +1,11 @@
 package modelo;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
 
-public class Cruce {
+public class Cruce implements Serializable {
 
     private List<Acceso> accesos;
     private ZonaCruce zonaCruce;
@@ -49,7 +50,7 @@ public class Cruce {
     }
 
     /** Una vía que entra al cruce, con su propio semáforo y su cola de espera. */
-    public static class Acceso {
+    public static class Acceso implements Serializable {
         private Via via;
         private Semaforo semaforo;
         private List<Vehiculo> colaEspera;

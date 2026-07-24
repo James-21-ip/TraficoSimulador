@@ -1,9 +1,10 @@
 package modelo;
 
+import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.Queue;
 
-public class Puente {
+public class Puente implements Serializable {
 
     public enum Sentido { IDA, VUELTA }
 

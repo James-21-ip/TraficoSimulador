@@ -1,6 +1,8 @@
 package modelo;
 
-public class Bache {
+import java.io.Serializable;
+
+public class Bache implements Serializable {
 
     private double x;
     private double y;

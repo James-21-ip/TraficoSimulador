@@ -1,9 +1,10 @@
 package modelo;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Carril {
+public class Carril implements Serializable {
 
     private Via via;
     private boolean sentidoIda; // true = va en la direccion normal del trazado, false = va al reves

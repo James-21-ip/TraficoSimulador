@@ -1,6 +1,8 @@
 package modelo;
 
-public class Auto extends Vehiculo {
+import java.io.Serializable;
+
+public class Auto extends Vehiculo implements Serializable {
 
     public Auto(double x, double y, Carril carril) {
         super(x, y, carril);

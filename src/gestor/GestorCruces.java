@@ -1,15 +1,15 @@
 package gestor;
 
+import java.io.Serializable;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import modelo.Cruce;
 import modelo.Puente;
 import modelo.Semaforo;
 import modelo.Vehiculo;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-public class GestorCruces {
+public class GestorCruces implements Serializable {
 
     // Tiempo fijo del verde
     private static final double TIEMPO_VERDE = 15.0;

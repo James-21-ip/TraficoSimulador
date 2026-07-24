@@ -1,10 +1,11 @@
 package modelo;
 
 import java.awt.geom.Rectangle2D;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ZonaCruce {
+public class ZonaCruce implements Serializable {
 
     private Rectangle2D area;
     private List<Peaton> peatonesCruzando;

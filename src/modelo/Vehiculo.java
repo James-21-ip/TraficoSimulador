@@ -1,6 +1,7 @@
 package modelo;
+import java.io.Serializable;
 import java.util.List;
-    public abstract class Vehiculo {
+    public abstract class Vehiculo implements Serializable {
 
         protected double x;
         protected double y;

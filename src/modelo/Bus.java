@@ -1,9 +1,10 @@
 package modelo;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Bus extends Vehiculo {
+public class Bus extends Vehiculo implements Serializable {
 
     private List<Peaton> pasajeros;
     private int capacidadMaxima;

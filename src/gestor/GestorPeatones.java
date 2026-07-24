@@ -1,13 +1,14 @@
 package gestor;
 
 import java.awt.geom.Rectangle2D;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import modelo.Peaton;
 import modelo.Vehiculo;
 
-public class GestorPeatones {
+public class GestorPeatones implements Serializable {
 
     private List<Peaton> peatones;
     private List<Rectangle2D> pasosAleatorios;

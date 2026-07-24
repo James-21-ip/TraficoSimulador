@@ -1,9 +1,10 @@
 package modelo;
 
 import java.awt.geom.Rectangle2D;
+import java.io.Serializable;
 import java.util.Random;
 
-public class Peaton {
+public class Peaton implements Serializable {
 
     public enum Estado {
         CAMINANDO_POR_VEREDA,
