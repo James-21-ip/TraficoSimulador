@@ -15,8 +15,8 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Queue;
 import java.util.Random;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -54,6 +54,8 @@ public class VentanaPrincipal extends JFrame {
     private static final int Y_AVENIDA = 400;
     private static final int PUENTE_X1 = 1180;
     private static final int PUENTE_X2 = 1400;
+    // borde real del canvas ampliado (puente + barrio del otro lado), ya casi fuera de vista
+    private static final int BORDE_LEJANO = PUENTE_X2 + 190;
 
     private PanelSimulacion panelSimulacion;
     private GestorVehiculos gestorVehiculos;
@@ -95,11 +97,11 @@ public class VentanaPrincipal extends JFrame {
 
         Via avE1 = crearViaHorizontal(40, Y_AVENIDA, X_CRUCE_1 - mitadCebra, Y_AVENIDA);
         Via avE2 = crearViaHorizontal(X_CRUCE_1 + mitadCebra, Y_AVENIDA, X_CRUCE_2 - mitadCebra, Y_AVENIDA);
-        Via avE3 = crearViaHorizontal(X_CRUCE_2 + mitadCebra, Y_AVENIDA, MAPA_ANCHO - 20, Y_AVENIDA);
+        Via avE3 = crearViaHorizontal(X_CRUCE_2 + mitadCebra, Y_AVENIDA, BORDE_LEJANO, Y_AVENIDA);
         avE1.agregarConexion(avE2);
         avE2.agregarConexion(avE3);
 
-        Via avW1 = crearViaHorizontal(MAPA_ANCHO - 20, Y_AVENIDA, X_CRUCE_2 + mitadCebra, Y_AVENIDA);
+        Via avW1 = crearViaHorizontal(BORDE_LEJANO, Y_AVENIDA, X_CRUCE_2 + mitadCebra, Y_AVENIDA);
         Via avW2 = crearViaHorizontal(X_CRUCE_2 - mitadCebra, Y_AVENIDA, X_CRUCE_1 + mitadCebra, Y_AVENIDA);
         Via avW3 = crearViaHorizontal(X_CRUCE_1 - mitadCebra, Y_AVENIDA, 40, Y_AVENIDA);
         avW1.agregarConexion(avW2);
@@ -229,8 +231,19 @@ public class VentanaPrincipal extends JFrame {
     }
 
     private void construirPuenteDemo() {
-        double x1 = PUENTE_X1 + 30, x2 = PUENTE_X2 - 30, y = 400;
-        Via viaPuente = new Via(Arrays.asList(new Point2D.Double(x1, y), new Point2D.Double(x2, y)), 2, true, 30);
+        // arranca justo donde termina avE3/avW1 (MAPA_ANCHO - 20) para que no quede
+        // un hueco entre la pista de la ciudad y el tablero del puente.
+        double x1 = MAPA_ANCHO - 20, x2 = PUENTE_X2 - 30, y = 400;
+        Via viaPuente = new Via(Arrays.asList(new Point2D.Double(x1, y), new Point2D.Double(x2, y)), 4, true, 30);
+
+        // 4 carriles, mismo esquema rápido/lento que las calles: carriles 0-1 = IDA
+        // (rápido pegado al centro, lento pegado a la baranda), carriles 2-3 = VUELTA,
+        // reflejados del otro lado de la línea central.
+        viaPuente.getCarriles().get(0).setOffsetY(-OFFSET_RAPIDO);
+        viaPuente.getCarriles().get(1).setOffsetY(-OFFSET_LENTO);
+        viaPuente.getCarriles().get(2).setOffsetY(OFFSET_RAPIDO);
+        viaPuente.getCarriles().get(3).setOffsetY(OFFSET_LENTO);
+
         puenteDemo = new Puente(viaPuente, 15);
 
         puentesDemo = new ArrayList<>(Arrays.asList(puenteDemo));
@@ -373,6 +386,16 @@ public class VentanaPrincipal extends JFrame {
                     this.puenteDemo = this.puentesDemo.get(0);
                 }
 
+                // los vehiculos del puente viajan sueltos en 'vehiculosPuente' (no se serializa
+                // directamente); tras cargar, se reconstruye a partir de lo que quedó en los
+                // carriles del puente (eso sí viaja dentro de puentesDemo -> Via -> Carril).
+                this.vehiculosPuente.clear();
+                if (this.puenteDemo != null) {
+                    for (Carril carril : this.puenteDemo.getVia().getCarriles()) {
+                        this.vehiculosPuente.addAll(carril.getVehiculos());
+                    }
+                }
+
                 panelSimulacion.setDatos(this.vias, this.cruces, this.puentesDemo, this.baches);
                 panelSimulacion.setGestorPeatones(this.gestorPeatones);
                 panelSimulacion.setEstadisticas(estadisticas, this.gestorVehiculos);
@@ -387,38 +410,45 @@ public class VentanaPrincipal extends JFrame {
         enPausa = estadoPausaPrevio;
     }
 
+    // ---------- tráfico del puente (dos carriles independientes, sin alternancia) ----------
+    //
+    // NOTA para el informe: Puente y GestorCruces siguen intactos y funcionando (cola FIFO
+    // + alternancia de sentido), es el algoritmo que pide el enunciado. Ya NO se usa para
+    // mover autos (ver iniciarLoopSimulacion): ahora el tráfico visible del puente es el
+    // mismo de avE3/avW1, que ya llega/sale por los bordes reales del mapa. Estos métodos
+    // quedan sin llamarse, pero se dejan tal cual para no romper guardarEstado/cargarEstado.
+
     private static final double LAMBDA_PUENTE = 0.10;
-    private static final int MAX_ESPERANDO_POR_SENTIDO = 2;
     private static final double DISTANCIA_MINIMA_SPAWN = 60;
-    private static final double DISTANCIA_LLEGADA = 12;
+    // qué tan lejos, más allá del tablero del puente, sigue el auto antes de desaparecer
+    // (para que no "desaparezca justo ahí": entra a la zona del otro barrio / vuelve a la
+    // ciudad y recién ahí se pierde de vista).
+    private static final double DISTANCIA_EXTRA_TRAS_CRUZAR = 350;
+
     private final Random randomPuente = new Random();
+    private final List<Vehiculo> vehiculosPuente = new ArrayList<>();
 
     private void actualizarPuenteDemo(double deltaTime) {
-        intentarSpawnPuente(Puente.Sentido.IDA, 0, deltaTime);
-        intentarSpawnPuente(Puente.Sentido.VUELTA, 1, deltaTime);
-        avanzarVehiculoCruzando(deltaTime);
+        for (Carril carril : puenteDemo.getVia().getCarriles()) {
+            intentarSpawnCarrilPuente(carril, deltaTime);
+        }
+        moverVehiculosPuente(deltaTime);
     }
 
-    private void intentarSpawnPuente(Puente.Sentido sentido, int indiceCarril, double deltaTime) {
+    private void intentarSpawnCarrilPuente(Carril carril, double deltaTime) {
         double probabilidad = 1 - Math.exp(-LAMBDA_PUENTE * deltaTime);
         if (randomPuente.nextDouble() >= probabilidad) return;
 
-        Queue<Vehiculo> cola = (sentido == puenteDemo.getSentidoActual())
-                ? puenteDemo.getColaActual() : puenteDemo.getColaOpuesta();
-        if (cola.size() >= MAX_ESPERANDO_POR_SENTIDO) return; 
-
-        Carril carril = puenteDemo.getVia().getCarriles().get(indiceCarril);
         double[] punto = carril.getPuntoInicio();
-
         for (Vehiculo v : carril.getVehiculos()) {
             if (Math.hypot(v.getX() - punto[0], v.getY() - punto[1]) < DISTANCIA_MINIMA_SPAWN) {
-                return; 
+                return; // ya hay uno recién aparecido justo ahí
             }
         }
 
         Vehiculo nuevo = crearVehiculoAleatorio(punto[0], punto[1], carril);
         carril.agregarVehiculo(nuevo);
-        puenteDemo.encolar(nuevo, sentido);
+        vehiculosPuente.add(nuevo);
     }
 
     private Vehiculo crearVehiculoAleatorio(double x, double y, Carril carril) {
@@ -428,20 +458,28 @@ public class VentanaPrincipal extends JFrame {
         return new Moto(x, y, carril);
     }
 
-    private void avanzarVehiculoCruzando(double deltaTime) {
-        Vehiculo cruzando = puenteDemo.getVehiculoCruzando();
-        if (cruzando == null) return;
+    /** Mueve cada auto del puente con seguimiento normal de distancia, y lo despacha
+     *  recién cuando ya avanzó bastante más allá del tablero (fuera de la vista). */
+    private void moverVehiculosPuente(double deltaTime) {
+        double largoPuente = puenteDemo.getVia().getTrazado().get(0)
+                .distance(puenteDemo.getVia().getTrazado().get(1));
+        double limite = largoPuente + DISTANCIA_EXTRA_TRAS_CRUZAR;
 
-        cruzando.mover(null, null, null, deltaTime); 
+        Iterator<Vehiculo> it = vehiculosPuente.iterator();
+        while (it.hasNext()) {
+            Vehiculo v = it.next();
+            Carril carril = v.getCarril();
+            Vehiculo adelante = carril.getVehiculoAdelante(v);
+            v.mover(adelante, null, null, deltaTime);
 
-        List<Point2D> trazado = puenteDemo.getVia().getTrazado();
-        Point2D destino = cruzando.getCarril().isSentidoIda()
-                ? trazado.get(trazado.size() - 1)
-                : trazado.get(0);
+            double[] inicio = carril.getPuntoInicio();
+            double[] dir = carril.getDireccion();
+            double avance = (v.getX() - inicio[0]) * dir[0] + (v.getY() - inicio[1]) * dir[1];
 
-        if (Math.hypot(cruzando.getX() - destino.getX(), cruzando.getY() - destino.getY()) < DISTANCIA_LLEGADA) {
-            cruzando.getCarril().quitarVehiculo(cruzando);
-            puenteDemo.terminarCruce(); 
+            if (avance >= limite) {
+                carril.quitarVehiculo(v);
+                it.remove();
+            }
         }
     }
 
@@ -457,7 +495,6 @@ public class VentanaPrincipal extends JFrame {
             }
             gestorVehiculos.actualizar(deltaTime);
             gestorCruces.actualizar(deltaTime);
-            actualizarPuenteDemo(deltaTime);
             
             // CAMBIA ESTO EN TU BUCLE DE SIMULACIÓN:
             if (gestorPeatones != null) {

@@ -59,7 +59,7 @@ public class PanelSimulacion extends JPanel {
     // zona decorativa al otro lado del río: para que el puente lleve a algo,
     // no depende del mapa real de vías (VentanaPrincipal), es puramente visual.
     private static final int OTRO_LADO_X1 = PUENTE_X2;
-    private static final int OTRO_LADO_ANCHO = 240;
+    private static final int OTRO_LADO_ANCHO = 300;
     private static final int OTRO_LADO_X2 = OTRO_LADO_X1 + OTRO_LADO_ANCHO;
 
     // ---------- colores ----------
@@ -172,6 +172,7 @@ public class PanelSimulacion extends JPanel {
         dibujarEdificiosYParque(g2);
         dibujarCalzadas(g2);
         dibujarOtroLadoCalle(g2);
+        dibujarPuenteDemo(g2); // el tablero es "piso": va antes que autos/cebras/semáforos para que no los tape
 
         for (Via via : vias) {
             dibujarLineaCentral(g2, via);
@@ -192,7 +193,6 @@ public class PanelSimulacion extends JPanel {
             dibujarCruce(g2, cruce);
         }
 
-        dibujarPuenteDemo(g2);
         if (gestorPeatones != null) {
             for (Peaton p : gestorPeatones.getPeatones()) {
                 g2.setColor(new Color(200, 100, 100)); // color distintivo para peatón
@@ -266,20 +266,15 @@ public class PanelSimulacion extends JPanel {
     // ---------- calle al otro lado del puente ----------
 
     /**
-     * Continúa la calzada del puente hacia el nuevo barrio y termina en un
-     * remate redondeado (como una plazoleta), sugiriendo que la calle sigue
-     * más allá del mapa visible en vez de terminar de la nada sobre el río.
+     * Continúa la calzada del puente hacia el nuevo barrio, casi hasta el borde
+     * del panel, para que se vea que la calle sigue (no que el puente termina
+     * de la nada sobre el río).
      */
     private void dibujarOtroLadoCalle(Graphics2D g2) {
         double xInicio = PUENTE_X2 - 30; // mismo punto donde termina el tablero del puente
-        double xFin = OTRO_LADO_X2 - 50;
+        double xFin = OTRO_LADO_X2 + 20; // casi pegado al borde derecho del panel
 
         dibujarBandaVial(g2, xInicio, Y_AVENIDA - MITAD_CALZADA, xFin - xInicio, MITAD_CALZADA * 2);
-
-        g2.setColor(COLOR_VEREDA);
-        g2.fill(new Ellipse2D.Double(xFin - MITAD_CALZADA - 6, Y_AVENIDA - MITAD_CALZADA - 6, MITAD_CALZADA * 2 + 12, MITAD_CALZADA * 2 + 12));
-        g2.setColor(COLOR_ASFALTO);
-        g2.fill(new Ellipse2D.Double(xFin - MITAD_CALZADA, Y_AVENIDA - MITAD_CALZADA, MITAD_CALZADA * 2, MITAD_CALZADA * 2));
     }
 
     // ---------- calzadas ----------
@@ -436,7 +431,7 @@ public class PanelSimulacion extends JPanel {
             Point2D b = via.getTrazado().get(via.getTrazado().size() - 1);
 
             g2.setColor(COLOR_PUENTE);
-            g2.setStroke(new BasicStroke(22, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND));
+            g2.setStroke(new BasicStroke(84, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND));
             g2.draw(new Line2D.Double(a, b));
 
             g2.setColor(new Color(230, 230, 230));
@@ -444,19 +439,12 @@ public class PanelSimulacion extends JPanel {
             for (double t = 0; t <= 1.0; t += 0.08) {
                 double x = a.getX() + (b.getX() - a.getX()) * t;
                 double y = a.getY() + (b.getY() - a.getY()) * t;
-                g2.draw(new Line2D.Double(x, y - 12, x, y + 12));
+                g2.draw(new Line2D.Double(x, y - 40, x, y + 40));
             }
 
             Point2D centro = new Point2D.Double((a.getX() + b.getX()) / 2, (a.getY() + b.getY()) / 2);
-            String texto = "Puente: " + (puente.getSentidoActual() == Puente.Sentido.IDA ? "IDA" : "VUELTA")
-                    + "  (esperan " + puente.getColaOpuesta().size() + ")";
             g2.setColor(Color.BLACK);
-            g2.drawString(texto, (float) centro.getX() - 60, (float) centro.getY() - 20);
-
-            if (!puente.estaLibre()) {
-                g2.setColor(Color.YELLOW);
-                g2.fill(new Ellipse2D.Double(centro.getX() - 4, centro.getY() - 4, 8, 8));
-            }
+            g2.drawString("Puente (4 carriles)", (float) centro.getX() - 55, (float) centro.getY() - 46);
 
             for (Carril carril : via.getCarriles()) {
                 for (Vehiculo v : carril.getVehiculos()) {
