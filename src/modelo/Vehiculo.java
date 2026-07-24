@@ -87,15 +87,15 @@ public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada,List<Pe
     if (peatones != null) {
         double[] dir = carril.getDireccion();
         for (Peaton p : peatones) {
-            if (p.getEstadoActual() == Peaton.Estado.CRUZANDO_CALLE) {
-                // Cálculo de distancia vectorial (vector distance)
+            // El auto ahora también frena si ve a alguien esperando en el borde (VERIFICANDO_TRAFICO)
+            if (p.getEstadoActual() == Peaton.Estado.CRUZANDO_CALLE || p.getEstadoActual() == Peaton.Estado.VERIFICANDO_TRAFICO) {
                 double dx = p.getX() - x;
                 double dy = p.getY() - y;
                 double proyeccionAdelante = dx * dir[0] + dy * dir[1];
                 double desviacionLateral = Math.abs(-dx * dir[1] + dy * dir[0]);
 
-                // Si el peatón está enfrente y en nuestro mismo carril proyectado (ancho)
-                if (proyeccionAdelante > 0 && proyeccionAdelante < 80 && desviacionLateral < ancho) {
+                // Aumentamos la visión frontal a 120px y la visión lateral a 35px (para que cubra todo el ancho del carril)
+                if (proyeccionAdelante > 0 && proyeccionAdelante < 120 && desviacionLateral < 35) {
                     if (proyeccionAdelante < distanciaPeaton) {
                         distanciaPeaton = proyeccionAdelante;
                     }

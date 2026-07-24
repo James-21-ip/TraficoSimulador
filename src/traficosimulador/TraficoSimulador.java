@@ -11,4 +11,4 @@ public class TraficoSimulador {
             ventana.setVisible(true);
         }); 
     }
-}   
+}

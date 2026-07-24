@@ -180,24 +180,26 @@ public class PanelSimulacion extends JPanel {
         for (Bache b : baches) {
             dibujarBache(g2, b);
         }
-        for (Cruce cruce : cruces) {
-            dibujarCruce(g2, cruce);
-        }
-        for (Via via : vias) {
-            dibujarVehiculosDeVia(g2, via);
-        }
-
         if (gestorPeatones != null) {
             for (Rectangle2D paso : gestorPeatones.getPasosAleatorios()) {
                 dibujarCebra(g2, paso);
             }
+        }
+        for (Via via : vias) {
+            dibujarVehiculosDeVia(g2, via);
+        }
+        for (Cruce cruce : cruces) {
+            dibujarCruce(g2, cruce);
+        }
+
+        dibujarPuenteDemo(g2);
+        if (gestorPeatones != null) {
             for (Peaton p : gestorPeatones.getPeatones()) {
                 g2.setColor(new Color(200, 100, 100)); // color distintivo para peatón
                 g2.fill(new Ellipse2D.Double(p.getX() - 4, p.getY() - 4, 8, 8));
             }
         }
 
-        dibujarPuenteDemo(g2);
 
         if (ventanaEstadisticas != null) {
             ventanaEstadisticas.dibujar(g2, gestorVehiculosRef);
@@ -344,7 +346,7 @@ public class PanelSimulacion extends JPanel {
     }
 
     private void dibujarCebra(Graphics2D g2, Rectangle2D zona) {
-        g2.setColor(Color.WHITE);
+        g2.setColor(new Color(190, 195, 190));
         int franjas = 6;
         
         if (zona.getWidth() >= zona.getHeight()) { 
