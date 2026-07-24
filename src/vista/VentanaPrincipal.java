@@ -162,17 +162,34 @@ public class VentanaPrincipal extends JFrame {
         gestorVehiculos.setBaches(baches);
         
         List<Rectangle2D> veredas = Arrays.asList(
-            new Rectangle2D.Double(40, Y_AVENIDA - 100, MAPA_ANCHO - 80, 50), 
-            new Rectangle2D.Double(40, Y_AVENIDA + 50, MAPA_ANCHO - 80, 50)   
+            new Rectangle2D.Double(40, Y_AVENIDA - 100, MAPA_ANCHO - 80, 40),  // Avenida Norte
+            new Rectangle2D.Double(40, Y_AVENIDA + 60, MAPA_ANCHO - 80, 40),   // Avenida Sur
+            new Rectangle2D.Double(X_CRUCE_1 - 100, 40, 40, MAPA_ALTO - 80),   // Calle 1 Oeste
+            new Rectangle2D.Double(X_CRUCE_1 + 60, 40, 40, MAPA_ALTO - 80),    // Calle 1 Este
+            new Rectangle2D.Double(X_CRUCE_2 - 100, 40, 40, MAPA_ALTO - 80),   // Calle 2 Oeste
+            new Rectangle2D.Double(X_CRUCE_2 + 60, 40, 40, MAPA_ALTO - 80)     // Calle 2 Este
         );
 
-        List<Rectangle2D> pasosRandom = Arrays.asList(
-            new Rectangle2D.Double(200, Y_AVENIDA - 42, 40, 84),
-            new Rectangle2D.Double(550, Y_AVENIDA - 42, 40, 84),
-            new Rectangle2D.Double(950, Y_AVENIDA - 42, 40, 84)
+        int grosorCebra = 24; // Ancho del paso peatonal
+        int mC = 42; // Mitad del tamaño del cruce
+        
+        // 4 cebras rodeando el Cruce 1 y 4 rodeando el Cruce 2
+        List<Rectangle2D> pasosEsquinas = Arrays.asList(
+            // Cruce 1 (Izquierda)
+            new Rectangle2D.Double(X_CRUCE_1 - mC - grosorCebra, Y_AVENIDA - mC, grosorCebra, mC * 2), // Oeste
+            new Rectangle2D.Double(X_CRUCE_1 + mC, Y_AVENIDA - mC, grosorCebra, mC * 2),               // Este
+            new Rectangle2D.Double(X_CRUCE_1 - mC, Y_AVENIDA - mC - grosorCebra, mC * 2, grosorCebra), // Norte
+            new Rectangle2D.Double(X_CRUCE_1 - mC, Y_AVENIDA + mC, mC * 2, grosorCebra),               // Sur
+            
+            // Cruce 2 (Derecha)
+            new Rectangle2D.Double(X_CRUCE_2 - mC - grosorCebra, Y_AVENIDA - mC, grosorCebra, mC * 2), // Oeste
+            new Rectangle2D.Double(X_CRUCE_2 + mC, Y_AVENIDA - mC, grosorCebra, mC * 2),               // Este
+            new Rectangle2D.Double(X_CRUCE_2 - mC, Y_AVENIDA - mC - grosorCebra, mC * 2, grosorCebra), // Norte
+            new Rectangle2D.Double(X_CRUCE_2 - mC, Y_AVENIDA + mC, mC * 2, grosorCebra)                // Sur
         );
 
-        this.gestorPeatones = new GestorPeatones(veredas, pasosRandom, 15);
+        // Subimos a 25 peatones para que se note la densidad en las esquinas
+        this.gestorPeatones = new GestorPeatones(veredas, pasosEsquinas, 25);
     }
 
     private Via crearVia(double x1, double y1, double x2, double y2) {

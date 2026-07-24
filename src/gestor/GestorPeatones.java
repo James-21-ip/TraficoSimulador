@@ -47,11 +47,12 @@ public class GestorPeatones implements Serializable {
     }
 
     private Rectangle2D obtenerPasoMasCercano(double px, double py) {
-        for (Rectangle2D paso : pasosAleatorios) {
-            if (Math.abs(paso.getCenterX() - px) < 150) return paso;
+            for (Rectangle2D paso : pasosAleatorios) {
+                // Evalúa la distancia exacta en 360 grados usando Pitágoras
+                if (Math.hypot(paso.getCenterX() - px, paso.getCenterY() - py) < 100) return paso;
+            }
+            return null;
         }
-        return null;
-    }
 
     public List<Peaton> getPeatones() { return peatones; }
     public List<Rectangle2D> getPasosAleatorios() { return pasosAleatorios; }

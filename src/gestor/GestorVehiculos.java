@@ -225,7 +225,7 @@ private Double calcularDistanciaParada(Vehiculo v) {
             return null;
         }
 
-        double distanciaLinea = avanceRestanteHastaFinDeVia(v, via);
+        double distanciaLinea = avanceRestanteHastaFinDeVia(v, via) - 26;
 
         // si el vehiculo YA paso la linea (ej. entro con verde y el semaforo
         // cambio justo despues), no tiene sentido congelarlo ahi: ya esta

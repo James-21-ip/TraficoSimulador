@@ -56,8 +56,11 @@ public class Peaton implements Serializable {
                 if (!hayPeligro) { // Si no hay autos cerca (calculado por el Gestor)
                     estadoActual = Estado.CRUZANDO_CALLE;
                     // Fija el destino al otro lado de la zona de cruce
-                    destinoY = (y < zonaCruceAsignada.getCenterY()) ? 
-                               zonaCruceAsignada.getMaxY() + 10 : zonaCruceAsignada.getMinY() - 10;
+                    if (zonaCruceAsignada.getWidth() < zonaCruceAsignada.getHeight()) {
+                        destinoX = (x < zonaCruceAsignada.getCenterX()) ? zonaCruceAsignada.getMaxX() + 10 : zonaCruceAsignada.getMinX() - 10;
+                    } else {
+                        destinoY = (y < zonaCruceAsignada.getCenterY()) ? zonaCruceAsignada.getMaxY() + 10 : zonaCruceAsignada.getMinY() - 10;
+                    }
                 }
                 break;
 
@@ -94,8 +97,15 @@ public class Peaton implements Serializable {
 
     public void asignarZonaCruce(Rectangle2D zona) {
         this.zonaCruceAsignada = zona;
-        this.destinoX = zona.getCenterX() + (random.nextDouble() * 10 - 5);
-        this.destinoY = (y < zona.getCenterY()) ? zona.getMinY() - 5 : zona.getMaxY() + 5;
+        if (zona.getWidth() < zona.getHeight()) { 
+            // Cebra vertical, el peatón se para en el borde Izquierdo/Derecho
+            this.destinoY = zona.getCenterY() + (random.nextDouble() * 10 - 5);
+            this.destinoX = (x < zona.getCenterX()) ? zona.getMinX() - 5 : zona.getMaxX() + 5;
+        } else {
+            // Cebra horizontal, el peatón se para en el borde Superior/Inferior
+            this.destinoX = zona.getCenterX() + (random.nextDouble() * 10 - 5);
+            this.destinoY = (y < zona.getCenterY()) ? zona.getMinY() - 5 : zona.getMaxY() + 5;
+        }
     }
 
     public double getX() { return x; }

@@ -344,14 +344,26 @@ public class PanelSimulacion extends JPanel {
     }
 
     private void dibujarCebra(Graphics2D g2, Rectangle2D zona) {
-        g2.setColor(COLOR_CEBRA);
+        g2.setColor(Color.WHITE);
         int franjas = 6;
-        double anchoFranja = zona.getWidth() / (franjas * 2.0);
-        for (int i = 0; i < franjas; i++) {
-            double x = zona.getX() + i * anchoFranja * 2;
-            g2.fill(new Rectangle2D.Double(x, zona.getY(), anchoFranja, zona.getHeight()));
+        
+        if (zona.getWidth() >= zona.getHeight()) { 
+            // Cebra horizontal (calles), dibujamos franjas verticales
+            double anchoFranja = zona.getWidth() / (franjas * 2.0);
+            for (int i = 0; i < franjas; i++) {
+                double x = zona.getX() + i * anchoFranja * 2;
+                g2.fill(new Rectangle2D.Double(x, zona.getY(), anchoFranja, zona.getHeight()));
+            }
+        } else { 
+            // Cebra vertical (avenidas), dibujamos franjas horizontales
+            double altoFranja = zona.getHeight() / (franjas * 2.0);
+            for (int i = 0; i < franjas; i++) {
+                double y = zona.getY() + i * altoFranja * 2;
+                g2.fill(new Rectangle2D.Double(zona.getX(), y, zona.getWidth(), altoFranja));
+            }
         }
     }
+    
 
     private void dibujarSemaforo(Graphics2D g2, Point2D punto, Semaforo.Estado estado) {
         Color color;
