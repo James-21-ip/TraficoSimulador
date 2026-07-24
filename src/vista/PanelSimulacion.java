@@ -333,10 +333,6 @@ public class PanelSimulacion extends JPanel {
 
             Point2D punto = via.getTrazado().get(via.getTrazado().size() - 1);
             dibujarSemaforo(g2, punto, acceso.getSemaforo().getEstadoActual());
-
-            g2.setColor(Color.BLACK);
-            g2.drawString(String.valueOf(acceso.getColaEspera().size()),
-                    (float) punto.getX() + 10, (float) punto.getY() - 8 + i * 12);
         }
     }
 
