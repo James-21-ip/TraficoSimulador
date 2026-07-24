@@ -160,14 +160,20 @@ public class VentanaPrincipal extends JFrame {
         gestorVehiculos = new GestorVehiculos();
         gestorVehiculos.setCruces(cruces);
         gestorVehiculos.setBaches(baches);
-        
+        int calzada = 42;
+        int anchoVereda = 12;
         List<Rectangle2D> veredas = Arrays.asList(
-            new Rectangle2D.Double(40, Y_AVENIDA - 100, MAPA_ANCHO - 80, 40),  // Avenida Norte
-            new Rectangle2D.Double(40, Y_AVENIDA + 60, MAPA_ANCHO - 80, 40),   // Avenida Sur
-            new Rectangle2D.Double(X_CRUCE_1 - 100, 40, 40, MAPA_ALTO - 80),   // Calle 1 Oeste
-            new Rectangle2D.Double(X_CRUCE_1 + 60, 40, 40, MAPA_ALTO - 80),    // Calle 1 Este
-            new Rectangle2D.Double(X_CRUCE_2 - 100, 40, 40, MAPA_ALTO - 80),   // Calle 2 Oeste
-            new Rectangle2D.Double(X_CRUCE_2 + 60, 40, 40, MAPA_ALTO - 80)     // Calle 2 Este
+            // Líneas horizontales de la Avenida (Norte y Sur)
+            new Rectangle2D.Double(40, Y_AVENIDA - calzada - anchoVereda, MAPA_ANCHO - 80, anchoVereda),
+            new Rectangle2D.Double(40, Y_AVENIDA + calzada, MAPA_ANCHO - 80, anchoVereda),
+            
+            // Líneas verticales de la Calle 1 (Izquierda y Derecha)
+            new Rectangle2D.Double(X_CRUCE_1 - calzada - anchoVereda, 40, anchoVereda, MAPA_ALTO - 80),
+            new Rectangle2D.Double(X_CRUCE_1 + calzada, 40, anchoVereda, MAPA_ALTO - 80),
+            
+            // Líneas verticales de la Calle 2 (Izquierda y Derecha)
+            new Rectangle2D.Double(X_CRUCE_2 - calzada - anchoVereda, 40, anchoVereda, MAPA_ALTO - 80),
+            new Rectangle2D.Double(X_CRUCE_2 + calzada, 40, anchoVereda, MAPA_ALTO - 80)
         );
 
         int grosorCebra = 24; // Ancho del paso peatonal
@@ -188,8 +194,8 @@ public class VentanaPrincipal extends JFrame {
             new Rectangle2D.Double(X_CRUCE_2 - mC, Y_AVENIDA + mC, mC * 2, grosorCebra)                // Sur
         );
 
-        // Subimos a 25 peatones para que se note la densidad en las esquinas
-        this.gestorPeatones = new GestorPeatones(veredas, pasosEsquinas, 25);
+        // Reducimos la cantidad de peatones por defecto para menos congestión
+        this.gestorPeatones = new GestorPeatones(veredas, pasosEsquinas, 10);
     }
 
     private Via crearVia(double x1, double y1, double x2, double y2) {
@@ -421,8 +427,10 @@ public class VentanaPrincipal extends JFrame {
             gestorCruces.actualizar(deltaTime);
             actualizarPuenteDemo(deltaTime);
             
+            // CAMBIA ESTO EN TU BUCLE DE SIMULACIÓN:
             if (gestorPeatones != null) {
-                gestorPeatones.actualizar(deltaTime, gestorVehiculos.getVehiculos());
+                // Ahora le pasamos también la lista global 'cruces'
+                gestorPeatones.actualizar(deltaTime, gestorVehiculos.getVehiculos(), cruces);
             }
 
             panelSimulacion.repaint();

@@ -83,21 +83,23 @@ public void mover(Vehiculo vehiculoAdelante, Double distanciaHastaParada,List<Pe
         return;
     }
     // Detección frontal de peatones (Frenado Dinámico)
+    // Detección frontal de peatones (Frenado Dinámico Mejorado)
     double distanciaPeaton = Double.MAX_VALUE;
     if (peatones != null) {
         double[] dir = carril.getDireccion();
         for (Peaton p : peatones) {
-            // El auto ahora también frena si ve a alguien esperando en el borde (VERIFICANDO_TRAFICO)
             if (p.getEstadoActual() == Peaton.Estado.CRUZANDO_CALLE || p.getEstadoActual() == Peaton.Estado.VERIFICANDO_TRAFICO) {
                 double dx = p.getX() - x;
                 double dy = p.getY() - y;
                 double proyeccionAdelante = dx * dir[0] + dy * dir[1];
                 double desviacionLateral = Math.abs(-dx * dir[1] + dy * dir[0]);
 
-                // Aumentamos la visión frontal a 120px y la visión lateral a 35px (para que cubra todo el ancho del carril)
-                if (proyeccionAdelante > 0 && proyeccionAdelante < 120 && desviacionLateral < 35) {
-                    if (proyeccionAdelante < distanciaPeaton) {
-                        distanciaPeaton = proyeccionAdelante;
+                // Aumentamos radar frontal a 160px y el ancho lateral a 50px (cubre todo el carril y cebra)
+                if (proyeccionAdelante > 0 && proyeccionAdelante < 160 && desviacionLateral < 50) {
+                    // Frenar 30 píxeles ANTES del peatón para no tocarlo visualmente
+                    double distanciaRealFrenado = proyeccionAdelante - 30;
+                    if (distanciaRealFrenado < distanciaPeaton) {
+                        distanciaPeaton = Math.max(0.1, distanciaRealFrenado); // Evitar valores negativos
                     }
                 }
             }
