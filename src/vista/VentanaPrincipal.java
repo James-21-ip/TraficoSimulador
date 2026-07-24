@@ -42,6 +42,7 @@ import modelo.ZonaCruce;
 
 public class VentanaPrincipal extends JFrame {
     private GestorPeatones gestorPeatones;
+    private final VentanaEstadisticas estadisticas = new VentanaEstadisticas();
 
     private static final int TICK_MS = 50; 
 
@@ -222,6 +223,7 @@ public class VentanaPrincipal extends JFrame {
         panelSimulacion = new PanelSimulacion();
         panelSimulacion.setDatos(vias, cruces, puentesDemo, baches);
         panelSimulacion.setGestorPeatones(this.gestorPeatones);
+        panelSimulacion.setEstadisticas(estadisticas, gestorVehiculos);
 
         add(new JScrollPane(panelSimulacion), BorderLayout.CENTER);
         add(construirPanelControles(), BorderLayout.SOUTH);
@@ -246,7 +248,6 @@ public class VentanaPrincipal extends JFrame {
         sliderVelocidad.addChangeListener(e -> multiplicadorVelocidad = sliderVelocidad.getValue());
         panel.add(sliderVelocidad);
 
-        // NUEVOS BOTONES GUARDAR/CARGAR
         JButton botonGuardar = new JButton("Guardar");
         botonGuardar.addActionListener(e -> guardarEstado());
         panel.add(botonGuardar);
@@ -270,7 +271,6 @@ public class VentanaPrincipal extends JFrame {
             File archivo = fileChooser.getSelectedFile();
             try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(archivo))) {
                 
-                // Exportando el grafo de objetos exacto
                 oos.writeObject(vias);
                 oos.writeObject(cruces);
                 oos.writeObject(puentesDemo);
@@ -301,7 +301,6 @@ public class VentanaPrincipal extends JFrame {
             File archivo = fileChooser.getSelectedFile();
             try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(archivo))) {
                 
-                // Reconstrucción estricta de la memoria
                 this.vias = (List<Via>) ois.readObject();
                 this.cruces = (List<Cruce>) ois.readObject();
                 this.puentesDemo = (List<Puente>) ois.readObject();
@@ -315,14 +314,13 @@ public class VentanaPrincipal extends JFrame {
                 this.gestorCruces = (GestorCruces) ois.readObject();
                 this.gestorPeatones = (GestorPeatones) ois.readObject();
 
-                // Repuntar puente
                 if (this.puentesDemo != null && !this.puentesDemo.isEmpty()) {
                     this.puenteDemo = this.puentesDemo.get(0);
                 }
 
-                // Inyectar referencias actualizadas a la UI
                 panelSimulacion.setDatos(this.vias, this.cruces, this.puentesDemo, this.baches);
                 panelSimulacion.setGestorPeatones(this.gestorPeatones);
+                panelSimulacion.setEstadisticas(estadisticas, this.gestorVehiculos);
                 panelSimulacion.repaint();
 
                 JOptionPane.showMessageDialog(this, "Simulación cargada exitosamente.");
@@ -396,6 +394,8 @@ public class VentanaPrincipal extends JFrame {
         timer = new Timer(TICK_MS, e -> {
             if (enPausa) return;
             double deltaTime = (TICK_MS / 1000.0) * multiplicadorVelocidad;
+
+            estadisticas.agregarTiempo(deltaTime);
 
             for (Entrada entrada : entradas) {
                 gestorVehiculos.intentarSpawn(entrada.via, entrada.lambda, deltaTime);

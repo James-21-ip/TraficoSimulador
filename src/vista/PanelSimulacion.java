@@ -1,5 +1,6 @@
 package vista;
 import gestor.GestorPeatones;
+import gestor.GestorVehiculos;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics;
@@ -40,6 +41,8 @@ import modelo.Via;
  */
 public class PanelSimulacion extends JPanel {
     private GestorPeatones gestorPeatones;
+    private VentanaEstadisticas ventanaEstadisticas;
+    private GestorVehiculos gestorVehiculosRef;
 
     // ---------- LAYOUT: debe coincidir con VentanaPrincipal ----------
     private static final int MAPA_ANCHO = 1180;
@@ -97,6 +100,14 @@ public class PanelSimulacion extends JPanel {
         this.cruces = cruces;
         this.puentes = puentes;
         this.baches = baches;
+    }
+
+    public void setGestorPeatones(GestorPeatones gp) { this.gestorPeatones = gp; }
+
+    /** Conecta el panel con las estadísticas en vivo (tiempo + conteo de vehículos). */
+    public void setEstadisticas(VentanaEstadisticas ve, GestorVehiculos gv) {
+        this.ventanaEstadisticas = ve;
+        this.gestorVehiculosRef = gv;
     }
 
     // ---------- decoración (se genera una sola vez, con semilla fija) ----------
@@ -170,25 +181,28 @@ public class PanelSimulacion extends JPanel {
             dibujarBache(g2, b);
         }
         for (Cruce cruce : cruces) {
-            //dibujarCruce(g2, cruce);
+            dibujarCruce(g2, cruce);
         }
         for (Via via : vias) {
             dibujarVehiculosDeVia(g2, via);
-            if (gestorPeatones != null) {
-                for (Rectangle2D paso : gestorPeatones.getPasosAleatorios()) {
-                    dibujarCebra(g2, paso);
-    }
-    // Dibujar Peatones
-        for (Peaton p : gestorPeatones.getPeatones()) {
-            g2.setColor(new java.awt.Color(200, 100, 100)); // Color distintivo para peatón
-            g2.fill(new java.awt.geom.Ellipse2D.Double(p.getX() - 4, p.getY() - 4, 8, 8));
         }
-    }
+
+        if (gestorPeatones != null) {
+            for (Rectangle2D paso : gestorPeatones.getPasosAleatorios()) {
+                dibujarCebra(g2, paso);
+            }
+            for (Peaton p : gestorPeatones.getPeatones()) {
+                g2.setColor(new Color(200, 100, 100)); // color distintivo para peatón
+                g2.fill(new Ellipse2D.Double(p.getX() - 4, p.getY() - 4, 8, 8));
+            }
         }
 
         dibujarPuenteDemo(g2);
+
+        if (ventanaEstadisticas != null) {
+            ventanaEstadisticas.dibujar(g2, gestorVehiculosRef);
+        }
     }
-    public void setGestorPeatones(GestorPeatones gp) { this.gestorPeatones = gp; }
 
     // ---------- ciudad (fondo decorativo) ----------
 
@@ -311,17 +325,9 @@ public class PanelSimulacion extends JPanel {
         return new Point2D.Double(p.getX() + perp[0] * offset, p.getY() + perp[1] * offset);
     }
 
-    // ---------- cruces (semáforos + cebra) ----------
+    // ---------- cruces (semáforos) ----------
 
     private void dibujarCruce(Graphics2D g2, Cruce cruce) {
-        Rectangle2D zona = cruce.getZonaCruce().getArea();
-        dibujarCebra(g2, zona);
-
-        if (cruce.getZonaCruce().hayPeatonCruzando()) {
-            g2.setColor(Color.WHITE);
-            g2.fill(new Ellipse2D.Double(zona.getCenterX() - 5, zona.getCenterY() - 5, 10, 10));
-        }
-
         List<Cruce.Acceso> accesos = cruce.getAccesos();
         for (int i = 0; i < accesos.size(); i++) {
             Cruce.Acceso acceso = accesos.get(i);
